@@ -1,6 +1,13 @@
 // Web Audio API Synthesizer for Cyberpunk Sound Effects (Zero External Files Needed)
 
 let audioCtx: AudioContext | null = null;
+let soundEnabled = true;
+
+export const setSoundEnabled = (enabled: boolean) => {
+  soundEnabled = enabled;
+};
+
+export const isSoundEnabled = (): boolean => soundEnabled;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -17,6 +24,7 @@ function getAudioContext(): AudioContext | null {
 }
 
 export const playSound = (type: 'coin' | 'chest-open' | 'chest-close' | 'tap' | 'lock' | 'radar-hot' | 'radar-cold' | 'win' | 'clear') => {
+  if (!soundEnabled) return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;

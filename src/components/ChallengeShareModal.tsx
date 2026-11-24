@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Check, Copy, Send, Sparkles, X } from 'lucide-react';
+import { Check, Copy, Send, Sparkles, X, ExternalLink } from 'lucide-react';
 import { playSound } from '../utils/sound';
+import { buildChallengeShareUrl, copyTextSafely, shareInTelegram, triggerHaptic } from '../utils/telegram';
 
 interface ChallengeShareModalProps {
   isOpen: boolean;
   onClose: () => void;
   stashedAmount: number;
+  zoneId: string;
   locationName: string;
   friendHandle: string;
   clue: string;
@@ -15,6 +17,7 @@ export const ChallengeShareModal: React.FC<ChallengeShareModalProps> = ({
   isOpen,
   onClose,
   stashedAmount,
+  zoneId,
   locationName,
   friendHandle,
   clue,
@@ -23,14 +26,28 @@ export const ChallengeShareModal: React.FC<ChallengeShareModalProps> = ({
 
   if (!isOpen) return null;
 
-  const cleanHandle = friendHandle.replace('@', '');
-  const shareUrl = `https://t.me/mycoinharvest_bot/app?startapp=${encodeURIComponent(locationName)}_${cleanHandle}_${stashedAmount}`;
+  const shareUrl = buildChallengeShareUrl({
+    zoneId,
+    friendHandle,
+    bounty: stashedAmount,
+  });
 
-  const handleCopy = () => {
+  const shareMessage = `🏴‍☠️ I hid ${stashedAmount} MCH for ${friendHandle} in MyCoinHarvest! Clue: "${clue || 'Crack my secret sector!'}" Can you find it in 3 probes?`;
+
+  const handleCopy = async () => {
     playSound('coin');
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2200);
+    triggerHaptic('light');
+    const ok = await copyTextSafely(shareUrl);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }
+  };
+
+  const handleTelegramShare = () => {
+    playSound('coin');
+    triggerHaptic('success');
+    shareInTelegram(shareUrl, shareMessage);
   };
 
   return (
@@ -45,16 +62,18 @@ export const ChallengeShareModal: React.FC<ChallengeShareModalProps> = ({
                 Stash Locked & Tagged!
               </h3>
               <p className="text-[11px] text-[#00f0ff] font-semibold">
-                Challenge is ready to send
+                Ready to send to {friendHandle}
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => {
               playSound('tap');
               onClose();
             }}
             className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition active:scale-95"
+            aria-label="Close share modal"
           >
             <X className="w-4 h-4" />
           </button>
@@ -80,7 +99,7 @@ export const ChallengeShareModal: React.FC<ChallengeShareModalProps> = ({
           {clue && (
             <div className="pt-1 border-t border-white/5">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-0.5">Clue:</span>
-              <p className="text-xs text-slate-300 italic">"{clue}"</p>
+              <p className="text-xs text-slate-300 italic">&ldquo;{clue}&rdquo;</p>
             </div>
           )}
         </div>
@@ -88,36 +107,50 @@ export const ChallengeShareModal: React.FC<ChallengeShareModalProps> = ({
         {/* Telegram Direct Link Box */}
         <div className="space-y-1.5">
           <label className="text-[11px] font-semibold text-slate-400">
-            Telegram Mini-App Direct Challenge Link:
+            Telegram Mini-App Challenge Link:
           </label>
           <div className="flex items-center gap-2">
             <input
               type="text"
               readOnly
               value={shareUrl}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
               className="flex-1 bg-[#13192c] border border-white/15 rounded-xl px-3 py-2 text-[11px] text-slate-200 outline-none font-mono"
             />
             <button
+              type="button"
               onClick={handleCopy}
               className="bg-[#00f0ff] hover:bg-[#00f0ff]/90 text-[#0a0b14] font-display font-bold text-xs px-3.5 py-2 rounded-xl transition active:scale-95 shrink-0 flex items-center gap-1 shadow-glow-cyan"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
+              <span>{copied ? 'Copied!' : 'Copy'}</span>
             </button>
           </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={() => {
-            playSound('tap');
-            onClose();
-          }}
-          className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#00f0ff] to-[#ec4899] text-[#0a0b14] font-display font-extrabold text-xs tracking-wider uppercase transition active:scale-95 flex items-center justify-center gap-1.5 shadow-glow-dual"
-        >
-          <Send className="w-3.5 h-3.5" />
-          <span>Done & Start Next Round</span>
-        </button>
+        {/* Primary Action: Share Directly in Telegram */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleTelegramShare}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#00f0ff] to-[#ec4899] text-[#0a0b14] font-display font-extrabold text-xs tracking-wider uppercase transition active:scale-95 flex items-center justify-center gap-1.5 shadow-glow-dual"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Send Challenge in Telegram</span>
+            <ExternalLink className="w-3 h-3" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playSound('tap');
+              onClose();
+            }}
+            className="w-full py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-display font-bold text-xs transition active:scale-95"
+          >
+            Done &amp; Start Next Round
+          </button>
+        </div>
       </div>
     </div>
   );

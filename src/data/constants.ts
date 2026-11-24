@@ -153,4 +153,20 @@ export const RAID_CHALLENGES: RaidChallenge[] = [
     clue: 'High on the skyline where microwave satellite dishes scan the clouds...',
     targetZoneId: 'rooftop-relay',
   },
+  {
+    id: 'chal-kai-1',
+    challenger: '@Kai',
+    avatar: '🌊',
+    bounty: 210,
+    clue: 'Moored beneath rusted pilings where neon reflects off dark harbor water...',
+    targetZoneId: 'sunken-pier',
+  },
+  {
+    id: 'chal-nova-1',
+    challenger: '@Nova',
+    avatar: '🕹️',
+    bounty: 195,
+    clue: 'Behind a glowing CRT cabinet in the backroom locker alley...',
+    targetZoneId: 'cyber-arcade',
+  },
 ];

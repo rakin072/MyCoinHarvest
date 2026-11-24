@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
@@ -15,7 +15,6 @@ async function runTest() {
   console.log('=== STARTING MOBILE DEVICE EMULATION TEST (390x844) ===');
   console.log('Target URL:', TARGET_URL);
 
-  // 1. Launch headless Chrome with remote debugging on port 9222
   const chromeProcess = spawn(CHROME_PATH, [
     '--headless=new',
     '--remote-debugging-port=9222',
@@ -27,7 +26,6 @@ async function runTest() {
     TARGET_URL,
   ], { stdio: 'ignore' });
 
-  // Wait for remote debugging endpoint
   let versionData = null;
   for (let i = 0; i < 30; i++) {
     try {
@@ -47,7 +45,6 @@ async function runTest() {
 
   console.log('Connected to Chrome:', versionData['Browser']);
 
-  // Get active targets
   const targetsRes = await fetch('http://127.0.0.1:9222/json');
   const targets = await targetsRes.json();
   const pageTarget = targets.find(t => t.type === 'page');
@@ -57,7 +54,6 @@ async function runTest() {
   }
 
   const ws = new WebSocket(pageTarget.webSocketDebuggerUrl);
-
   let idCounter = 1;
   const pendingRequests = new Map();
 
@@ -71,7 +67,6 @@ async function runTest() {
 
   const networkResponses = [];
   const networkFailures = [];
-  const consoleMessages = [];
   const consoleErrors = [];
 
   await new Promise((resolve, reject) => {
@@ -92,39 +87,30 @@ async function runTest() {
       return;
     }
 
-    // Event handling
     if (message.method === 'Network.responseReceived') {
       const { response } = message.params;
-      networkResponses.push({ url: response.url, status: response.status, mimeType: response.mimeType });
+      networkResponses.push({ url: response.url, status: response.status });
     } else if (message.method === 'Network.loadingFailed') {
       networkFailures.push(message.params);
     } else if (message.method === 'Runtime.consoleAPICalled') {
-      const args = message.params.args.map(a => a.value ?? a.description ?? '').join(' ');
-      consoleMessages.push({ type: message.params.type, text: args });
       if (message.params.type === 'error') {
+        const args = message.params.args.map(a => a.value ?? a.description ?? '').join(' ');
         consoleErrors.push(args);
       }
     } else if (message.method === 'Runtime.exceptionThrown') {
       const text = message.params.exceptionDetails?.text || 'Uncaught exception';
-      const desc = message.params.exceptionDetails?.exception?.description || '';
-      consoleErrors.push(`${text}: ${desc}`);
+      consoleErrors.push(text);
     }
   };
 
-  // Enable CDP domains
   await sendCommand('Page.enable');
   await sendCommand('Runtime.enable');
   await sendCommand('Network.enable');
-
-  // Set Mobile Device Metrics (390x844 viewport, iPhone 14 style)
   await sendCommand('Emulation.setDeviceMetricsOverride', VIEWPORT);
-  console.log(`Mobile Viewport Override Applied: ${VIEWPORT.width}x${VIEWPORT.height} (Scale: ${VIEWPORT.deviceScaleFactor})`);
 
-  // Navigate to target
   await sendCommand('Page.navigate', { url: TARGET_URL });
-  await sleep(1500);
+  await sleep(1200);
 
-  // Helper for evaluating JS in page context
   async function evalInPage(expression) {
     const res = await sendCommand('Runtime.evaluate', {
       expression,
@@ -135,248 +121,184 @@ async function runTest() {
   }
 
   const testResults = [];
-
   function recordTest(name, passed, details = '') {
     testResults.push({ name, passed, details });
-    const status = passed ? 'PASS' : 'FAIL';
-    console.log(`[${status}] ${name} ${details ? '- ' + details : ''}`);
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] ${name}${details ? ' - ' + details : ''}`);
   }
 
-  // --- TEST 1: Check zero broken images and check /IMG_0900.jpeg ---
+  // Ensure clean state first (clear localStorage)
+  await evalInPage(`localStorage.clear(); location.reload();`);
+  await sleep(1200);
+
+  // TEST 1: Branding Asset & Zero Errors
   const imgResponse = networkResponses.find(r => r.url.includes('/IMG_0900.jpeg'));
   const imgLoadedInDom = await evalInPage(`
     (() => {
       const img = document.querySelector('img[src="/IMG_0900.jpeg"]');
-      return img ? { found: true, complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight } : { found: false };
+      return img ? { found: true, complete: img.complete, naturalWidth: img.naturalWidth } : { found: false };
     })()
   `);
+  recordTest('Branding Asset HTTP 200 & Rendered', !!imgResponse && imgResponse.status === 200 && imgLoadedInDom?.naturalWidth > 0, `Status ${imgResponse?.status}, Width ${imgLoadedInDom?.naturalWidth}px`);
+  recordTest('Zero Broken Requests & Console Errors', networkFailures.length === 0 && consoleErrors.length === 0, `Failures: ${networkFailures.length}, Errors: ${consoleErrors.length}`);
 
-  recordTest('Branding Asset HTTP 200', !!imgResponse && imgResponse.status === 200, `Status: ${imgResponse?.status}`);
-  recordTest('Branding Asset Rendered in DOM', imgLoadedInDom?.found && imgLoadedInDom?.complete && imgLoadedInDom?.naturalWidth > 0, `Width: ${imgLoadedInDom?.naturalWidth}px, Height: ${imgLoadedInDom?.naturalHeight}px`);
-  recordTest('Zero Broken Image / Resource Requests', networkFailures.length === 0, `Failures: ${networkFailures.length}`);
-  recordTest('Zero Console Errors', consoleErrors.length === 0, `Errors: ${consoleErrors.join('; ') || 'None'}`);
-
-  // --- TEST 2: 2D Interactive Chest Open/Close Toggle & "100 MCH Ready" Badge ---
-  const initialChestState = await evalInPage(`
+  // TEST 2: Header has no truncated subtitle & Settings modal works
+  const headerClean = await evalInPage(`
     (() => {
-      const topBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('TAP CHEST'));
-      return {
-        btnText: topBtn ? topBtn.textContent.trim() : null,
-        bountyText: document.body.innerText.includes('100 MCH') || document.body.innerText.includes('LOADED:'),
-      };
+      const text = document.querySelector('header')?.innerText || '';
+      return text.includes('mycoinharvest.com • MCH') && !text.includes('...');
     })()
   `);
-  recordTest('Initial Chest Loaded', initialChestState.btnText !== null, `Button: "${initialChestState.btnText}"`);
+  recordTest('Header Subtitle Untruncated', headerClean);
 
-  // Tap Chest to Open
-  await evalInPage(`
-    (() => {
-      const topBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('TAP CHEST'));
-      if (topBtn) topBtn.click();
-    })()
-  `);
-  await sleep(600);
+  // Open Help/Settings modal and toggle sound
+  await evalInPage(`document.querySelector('button[aria-label="How to play and settings"]')?.click()`);
+  await sleep(300);
+  const helpModalVisible = await evalInPage(`document.body.innerText.includes('How to Play & Settings')`);
+  await evalInPage(`document.querySelector('button[aria-label="Close settings"]')?.click()`);
+  await sleep(200);
+  recordTest('Help & Settings Modal Opens/Closes', helpModalVisible);
 
-  const openedChestState = await evalInPage(`
-    (() => {
-      const readyBadge = document.body.innerText.includes('100 MCH Ready');
-      const topBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('TAP CHEST'));
-      const goldCoins = document.querySelectorAll('ellipse[fill="url(#goldCoinGrad)"]').length;
-      return {
-        btnText: topBtn ? topBtn.textContent.trim() : null,
-        hasReadyBadge: readyBadge,
-        coinsCount: goldCoins,
-      };
-    })()
-  `);
-  recordTest('Chest Open Toggle & Coins Visible', openedChestState.coinsCount > 0, `Found ${openedChestState.coinsCount} coins cluster, Button: "${openedChestState.btnText}"`);
-  recordTest('Emerge "100 MCH Ready" Badge', openedChestState.hasReadyBadge, 'Badge emerged centered directly over chest');
-
-  // Test Coin Staking buttons (+25, +100, +250, Max Half)
-  const addCoinsResult = await evalInPage(`
-    (() => {
-      const plus25Btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '+25');
-      if (plus25Btn) plus25Btn.click();
-      return true;
-    })()
-  `);
+  // TEST 3: Chest open toggle & "100 MCH Ready" badge
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('TAP CHEST'))?.click()`);
   await sleep(400);
-
-  const balanceAfter25 = await evalInPage(`
-    (() => {
-      return {
-        bounty125: document.body.innerText.includes('125') && document.body.innerText.includes('MCH'),
-        balance975: document.body.innerText.includes('975 MCH'),
-      };
-    })()
+  const openedState = await evalInPage(`
+    (() => ({
+      hasReady: document.body.innerText.includes('100 MCH Ready'),
+      coins: document.querySelectorAll('ellipse[fill="url(#goldCoinGrad)"]').length
+    }))()
   `);
-  recordTest('Coin Staking (+25 Deducts & Stashes)', balanceAfter25.bounty125 && balanceAfter25.balance975, 'Bounty: 125 MCH, Balance: 975 MCH');
+  recordTest('Chest Open Toggle & 100 MCH Ready Badge', openedState.hasReady && openedState.coins > 0, `Coins: ${openedState.coins}`);
 
-  // Test +100 staking
-  await evalInPage(`
-    (() => {
-      const plus100Btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '+100');
-      if (plus100Btn) plus100Btn.click();
-    })()
+  // TEST 4: Reset empties coins completely (no fake coins at 0 MCH!)
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Reset')?.click()`);
+  await sleep(300);
+  const emptyChestState = await evalInPage(`
+    (() => ({
+      coins: document.querySelectorAll('ellipse[fill="url(#goldCoinGrad)"]').length,
+      emptyHint: document.body.innerText.includes('Vault is empty')
+    }))()
   `);
-  await sleep(400);
+  recordTest('Reset Empties Coins Inside Open Chest', emptyChestState.coins === 0 && emptyChestState.emptyHint, `Coins at 0 MCH: ${emptyChestState.coins}`);
 
-  const balanceAfter100 = await evalInPage(`
-    (() => {
-      return {
-        bounty225: document.body.innerText.includes('225') && document.body.innerText.includes('MCH'),
-        balance875: document.body.innerText.includes('875 MCH'),
-      };
-    })()
+  // TEST 5: Quick Load & +25/+100 coin loading
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '+100')?.click()`);
+  await sleep(300);
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '+25')?.click()`);
+  await sleep(300);
+  const afterLoad = await evalInPage(`
+    document.body.innerText.includes('LOADED: 125 MCH') && document.body.innerText.includes('975 MCH')
   `);
-  recordTest('Coin Staking (+100 Deducts & Stashes)', balanceAfter100.bounty225 && balanceAfter100.balance875, 'Bounty: 225 MCH, Balance: 875 MCH');
+  recordTest('Coin Loading (+100 +25 = 125 MCH)', afterLoad);
 
-  // --- TEST 3: All 8 Hiding Sectors Selection ---
+  // TEST 6: All 8 Hiding Sectors
   const SECTORS = [
-    'Shadow Vault',
-    'Neon Canopy',
-    'Subway Tunnel',
-    'Rooftop Relay',
-    'Sunken Pier',
-    'Cyber Arcade',
-    'Canyon Bridge',
-    'Obsidian Bunker'
+    'Shadow Vault', 'Neon Canopy', 'Subway Tunnel', 'Rooftop Relay',
+    'Sunken Pier', 'Cyber Arcade', 'Canyon Bridge', 'Obsidian Bunker',
   ];
-
-  let allSectorsPassed = true;
-  for (const sectorName of SECTORS) {
-    const selected = await evalInPage(`
+  let sectorsOk = true;
+  for (const name of SECTORS) {
+    const ok = await evalInPage(`
       (() => {
-        const card = Array.from(document.querySelectorAll('button, div')).find(el => el.textContent.includes('${sectorName}') && el.getAttribute('role') === 'button');
-        if (card) {
-          card.click();
-          return true;
-        }
-        // Fallback search
-        const anyEl = Array.from(document.querySelectorAll('h3, div')).find(el => el.textContent.trim() === '${sectorName}');
-        if (anyEl) {
-          const btn = anyEl.closest('button') || anyEl.closest('[role="button"]') || anyEl.parentElement;
-          if (btn) { btn.click(); return true; }
-        }
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('${name}'));
+        if (btn) { btn.click(); return true; }
         return false;
       })()
     `);
-    await sleep(200);
-    const headerUpdates = await evalInPage(`
-      (() => {
-        return document.body.innerText.includes('${sectorName}');
-      })()
-    `);
-    if (!selected || !headerUpdates) allSectorsPassed = false;
+    if (!ok) sectorsOk = false;
   }
-  recordTest('All 8 Hiding Sectors Interactive & Selectable', allSectorsPassed, `Verified ${SECTORS.length} sectors: ${SECTORS.join(', ')}`);
+  await sleep(200);
+  recordTest('All 8 Hiding Sectors Selectable', sectorsOk);
 
-  // --- TEST 4: Custom Friend Tagging & Dynamic CTA ---
-  // Click friend chips: @Alex, @Maya, @Jordan, @Sam
-  const chipMaya = await evalInPage(`
+  // TEST 7: Custom @username Tagging + Lock Stash Share Modal URL & Exact Amount
+  await evalInPage(`
     (() => {
-      const chip = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('@Maya'));
-      if (chip) { chip.click(); return true; }
-      return false;
+      const input = document.querySelector('input[placeholder*="@username"]');
+      if (input) {
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(input, 'CyberSamurai');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
     })()
   `);
   await sleep(200);
+  await evalInPage(`
+    Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('LOCK STASH'))?.click()
+  `);
+  await sleep(400);
 
-  const ctaWithMaya = await evalInPage(`
+  const shareModalState = await evalInPage(`
     (() => {
-      const cta = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('LOCK STASH & TAG'));
-      return cta ? cta.textContent.trim() : null;
+      const shareInput = document.querySelector('input[value*="t.me/mycoinharvest_bot"]');
+      const modalText = document.body.innerText;
+      return {
+        url: shareInput ? shareInput.value : null,
+        hasExact125: modalText.includes('125 MCH'),
+        hasFriend: modalText.includes('@CyberSamurai'),
+        hasTelegramSend: modalText.toLowerCase().includes('send challenge in telegram'),
+      };
     })()
   `);
-  recordTest('Quick-Tag Chip Selection (@Maya)', ctaWithMaya?.includes('@MAYA'), `CTA: "${ctaWithMaya}"`);
+  recordTest(
+    'Share Modal Shows Exact Amount & /treasure Link',
+    Boolean(shareModalState.url?.includes('https://t.me/mycoinharvest_bot/treasure?startapp=')) &&
+      shareModalState.hasExact125 &&
+      shareModalState.hasFriend &&
+      shareModalState.hasTelegramSend,
+    shareModalState.url || 'Missing URL'
+  );
 
-  // Custom Username typing
-  const customUsernameTest = await evalInPage(`
-    (() => {
-      const input = document.querySelector('input[placeholder*="@username"]') || document.querySelector('input[placeholder*="Telegram"]');
-      if (input) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(input, 'CyberSamurai');
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        return true;
-      }
-      return false;
-    })()
+  // Close Share Modal
+  await evalInPage(`document.querySelector('button[aria-label="Close share modal"]')?.click()`);
+  await sleep(200);
+
+  // TEST 8: Raid Mode Clean UI (no dead coin buttons) + Hot/Cold Sector Badges
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Raid Friend'))?.click()`);
+  await sleep(400);
+  const raidUiClean = await evalInPage(`
+    (() => ({
+      noCoinButtons: !document.body.innerText.includes('Load MCH Coins Into Vault'),
+      hasTargetVault: document.body.innerText.includes('MCH Prize'),
+      hasProbes: document.body.innerText.includes('PROBES (3)'),
+    }))()
   `);
+  recordTest('Raid Mode Hides Dead Coin Controls & Shows Target Vault', raidUiClean.noCoinButtons && raidUiClean.hasTargetVault && raidUiClean.hasProbes);
+
+  // Scan a Cold sector (Shadow Vault when target is Obsidian Bunker)
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Shadow Vault') && b.textContent.includes('Scan Sector'))?.click()`);
   await sleep(300);
+  const coldFeedback = await evalInPage(`document.body.innerText.includes('Cold Signal') && document.body.innerText.includes('PROBES (2)')`);
+  recordTest('Raid Cold Signal & Probe Deduction', coldFeedback);
 
-  const ctaCustom = await evalInPage(`
-    (() => {
-      const cta = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('LOCK STASH & TAG'));
-      return cta ? cta.textContent.trim() : null;
-    })()
-  `);
-  recordTest('Custom @username Input Dynamic CTA', ctaCustom?.includes('@CYBERSAMURAI'), `CTA: "${ctaCustom}"`);
+  // Scan a Hot sector (Canyon Bridge when target is Obsidian Bunker)
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Canyon Bridge') && b.textContent.includes('Scan Sector'))?.click()`);
+  await sleep(300);
+  const hotFeedback = await evalInPage(`document.body.innerText.includes('Hot Nearby') && document.body.innerText.includes('PROBES (1)')`);
+  recordTest('Raid Hot Nearby Signal & Probe Deduction', hotFeedback);
 
-  // --- TEST 5: Raid Mode with 3 Scanner Probes & Hot/Cold Feedback ---
-  const switchedToRaid = await evalInPage(`
-    (() => {
-      const raidTab = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Raid Friend'));
-      if (raidTab) {
-        raidTab.click();
-        return true;
-      }
-      return false;
-    })()
-  `);
-  await sleep(500);
+  // Scan Winning sector (Obsidian Bunker)
+  await evalInPage(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Obsidian Bunker') && b.textContent.includes('Scan Sector'))?.click()`);
+  await sleep(400);
+  const winFeedback = await evalInPage(`document.body.innerText.includes('VAULT CRACKED') && document.body.innerText.includes('+180 MCH Won!')`);
+  recordTest('Raid Win Cracks Vault & Awards Bounty', winFeedback);
 
-  const raidInitialState = await evalInPage(`
-    (() => {
-      const text = document.body.innerText;
-      const hasProbes = text.includes('SCANNER PROBES') || text.includes('PROBES');
-      const hasClue = text.includes('INTERCEPTED CLUE') || text.includes('blast hatch');
-      const hasTarget = text.includes('Target:');
-      return { hasProbes, hasClue, hasTarget };
-    })()
-  `);
-  recordTest('Raid Mode Loaded with Target & Clue', raidInitialState.hasTarget && raidInitialState.hasClue, 'Target info and Intercepted Clue rendered');
-
-  // Deploy 1 Scanner Probe by clicking a raid sector
-  const probeDeployed = await evalInPage(`
-    (() => {
-      const sectorBtn = Array.from(document.querySelectorAll('button, div')).find(el => el.textContent.includes('Shadow Vault') && (el.textContent.includes('Scan') || el.onclick || el.getAttribute('role') === 'button'));
-      if (sectorBtn) {
-        sectorBtn.click();
-        return true;
-      }
-      return false;
-    })()
-  `);
-  await sleep(500);
-
-  const raidAfterScan = await evalInPage(`
-    (() => {
-      const text = document.body.innerText;
-      const hasFeedback = text.includes('Empty') || text.includes('Cold') || text.includes('Warm') || text.includes('Hot') || text.includes('CRACKED') || text.includes('Radar') || text.includes('Probes Left') || text.includes('PROBES');
-      return { hasFeedback };
-    })()
-  `);
-  recordTest('Scanner Probe Deployment & Radar Feedback', raidAfterScan.hasFeedback, 'Probe consumed and scan feedback rendered');
-
-  // Capture Screenshot in Mobile Viewport
+  // Screenshot Raid Mode
   const screenshotData = await sendCommand('Page.captureScreenshot', { format: 'png' });
-  const screenshotBuffer = Buffer.from(screenshotData.data, 'base64');
-  const screenshotPath = join(process.cwd(), 'reference', 'mobile-preview-390x844.png');
-  writeFileSync(screenshotPath, screenshotBuffer);
-  console.log(`Saved Mobile Viewport Screenshot (390x844) to: ${screenshotPath}`);
+  writeFileSync(join(process.cwd(), 'reference', 'mobile-preview-390x844.png'), Buffer.from(screenshotData.data, 'base64'));
 
-  // Clean up
+  // TEST 9: Deep-link ?startapp= parsing opens Raid Mode with tagged challenge
+  await sendCommand('Page.navigate', { url: `${TARGET_URL}?startapp=rooftop-relay__Viper__320` });
+  await sleep(1000);
+  const deepLinkOk = await evalInPage(`
+    document.body.innerText.includes('@Viper') && document.body.innerText.includes('320 MCH') && document.body.innerText.includes('TAGGED')
+  `);
+  recordTest('Telegram ?startapp= Deep-Link Loads Friend Raid', deepLinkOk);
+
   ws.close();
   chromeProcess.kill();
 
-  console.log('\n=== TEST SUITE SUMMARY ===');
-  const allPassed = testResults.every(t => t.passed);
-  console.log(`Total Tests: ${testResults.length} | Passed: ${testResults.filter(t => t.passed).length} | Failed: ${testResults.filter(t => !t.passed).length}`);
-  console.log('Result:', allPassed ? 'ALL TESTS PASSED SUCCESSFULLY! ✅' : 'SOME TESTS FAILED ❌');
-
-  if (!allPassed) {
+  const passedCount = testResults.filter(t => t.passed).length;
+  console.log(`\n=== SUMMARY: ${passedCount}/${testResults.length} PASSED ===`);
+  if (passedCount !== testResults.length) {
     process.exit(1);
   }
 }

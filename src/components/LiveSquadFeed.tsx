@@ -19,6 +19,9 @@ export const LiveSquadFeed: React.FC<LiveSquadFeedProps> = ({ activity }) => {
     }
   };
 
+  // Show latest 6 entries so the mobile feed remains compact and readable
+  const visibleItems = activity.slice(0, 6);
+
   return (
     <div className="bg-[#0d111e]/90 border border-white/10 rounded-2xl p-3.5 space-y-2.5 shadow-md backdrop-blur-md">
       {/* Header: Green status dot + "Recent Raids & Tags" on left, "Live Squad Feed" in gray on right */}
@@ -32,21 +35,21 @@ export const LiveSquadFeed: React.FC<LiveSquadFeedProps> = ({ activity }) => {
         </span>
       </div>
 
-      {/* List of Live Activity Rows */}
+      {/* List of Live Activity Rows (allows clean wrapping instead of cutting off names/bounties) */}
       <div className="space-y-1.5 text-xs">
-        {activity.map((item) => (
+        {visibleItems.map((item) => (
           <div
             key={item.id}
-            className="flex items-center justify-between gap-2.5 bg-[#090c17]/95 border border-white/5 rounded-xl px-3 py-2 transition-colors hover:border-white/15"
+            className="flex items-start justify-between gap-2.5 bg-[#090c17]/95 border border-white/5 rounded-xl px-3 py-2 transition-colors hover:border-white/15"
           >
-            {/* Left: Colored Status Dot + Text */}
-            <div className="flex items-center gap-2 min-w-0">
+            {/* Left: Colored Status Dot + Readable Text */}
+            <div className="flex items-start gap-2 min-w-0">
               <span
-                className={`w-2 h-2 rounded-full shrink-0 transition-all ${getDotClass(
+                className={`w-2 h-2 rounded-full shrink-0 mt-1.5 transition-all ${getDotClass(
                   item.dotColor
                 )}`}
               />
-              <span className="truncate text-slate-300 text-[11px] sm:text-xs">
+              <span className="text-slate-300 text-[11px] sm:text-xs leading-snug break-words">
                 {item.fullText ? (
                   item.fullText
                 ) : (
@@ -59,7 +62,7 @@ export const LiveSquadFeed: React.FC<LiveSquadFeedProps> = ({ activity }) => {
             </div>
 
             {/* Right: Relative Timestamp in Gray */}
-            <span className="text-[10px] text-slate-500 font-mono shrink-0 whitespace-nowrap">
+            <span className="text-[10px] text-slate-500 font-mono shrink-0 whitespace-nowrap mt-0.5">
               {item.timestamp}
             </span>
           </div>

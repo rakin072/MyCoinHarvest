@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Header } from './components/Header';
 import { PlayerStats } from './components/PlayerStats';
 import { ModeTabs } from './components/ModeTabs';
@@ -10,65 +10,198 @@ import { LiveSquadFeed } from './components/LiveSquadFeed';
 import { ConnectWalletModal } from './components/ConnectWalletModal';
 import { ChallengeShareModal } from './components/ChallengeShareModal';
 import { BuyStoreModal, StorePack } from './components/BuyStoreModal';
+import { HelpSettingsModal } from './components/HelpSettingsModal';
 import { HIDING_ZONES, INITIAL_ACTIVITY, RAID_CHALLENGES } from './data/constants';
-import { ActivityItem, HidingZone } from './types';
-import { playSound } from './utils/sound';
+import { ActivityItem, HidingZone, RaidChallenge } from './types';
+import { playSound, setSoundEnabled } from './utils/sound';
+import {
+  getIncomingStartChallenge,
+  getTelegramUser,
+  initTelegramWebApp,
+  triggerHaptic,
+} from './utils/telegram';
 import confetti from 'canvas-confetti';
 
-export const App: React.FC = () => {
-  // Global App State
-  const [mchBalance, setMchBalance] = useState<number>(1000);
-  const [stashedBounty, setStashedBounty] = useState<number>(100);
-  const [activeTab, setActiveTab] = useState<'hide' | 'raid'>('hide');
-  const [streak, setStreak] = useState<number>(2);
+const STORAGE_KEY = 'mch_miniapp_state_v1';
 
-  // Interactive Chest & Gameplay State
-  const [isChestOpen, setIsChestOpen] = useState<boolean>(false);
+interface PersistedState {
+  mchBalance: number;
+  stashedBounty: number;
+  streak: number;
+  walletAddress: string | null;
+  activityFeed: ActivityItem[];
+  soundOn: boolean;
+}
+
+interface LockedChallengeSnapshot {
+  amount: number;
+  zoneId: string;
+  locationName: string;
+  friendHandle: string;
+  clue: string;
+}
+
+function loadSavedState(): Partial<PersistedState> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<PersistedState>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export const App: React.FC = () => {
+  const saved = useRef(loadSavedState()).current;
+
+  // Global App State (hydrated from localStorage when available)
+  const [mchBalance, setMchBalance] = useState<number>(
+    typeof saved.mchBalance === 'number' ? saved.mchBalance : 1000
+  );
+  const [stashedBounty, setStashedBounty] = useState<number>(
+    typeof saved.stashedBounty === 'number' ? saved.stashedBounty : 100
+  );
+  const [activeTab, setActiveTab] = useState<'hide' | 'raid'>('hide');
+  const [streak, setStreak] = useState<number>(
+    typeof saved.streak === 'number' ? saved.streak : 2
+  );
+  const [soundOn, setSoundOn] = useState<boolean>(
+    typeof saved.soundOn === 'boolean' ? saved.soundOn : true
+  );
+
+  // Telegram user info
+  const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
+
+  // Interactive Chest & Hide Mode State
+  const [isHideChestOpen, setIsHideChestOpen] = useState<boolean>(false);
   const [selectedZone, setSelectedZone] = useState<HidingZone>(HIDING_ZONES[0]);
   const [clue, setClue] = useState<string>('Look where neon signals bounce off steel...');
   const [selectedFriend, setSelectedFriend] = useState<string>('@Alex');
   const [customFriend, setCustomFriend] = useState<string>('');
-  
-  // Raid Challenge State
+  const [lastLockedChallenge, setLastLockedChallenge] = useState<LockedChallengeSnapshot | null>(null);
+
+  // Raid Mode State
+  const [incomingChallenge, setIncomingChallenge] = useState<RaidChallenge | null>(null);
   const [currentChallengeIndex, setCurrentChallengeIndex] = useState<number>(0);
-  const currentRaidChallenge = RAID_CHALLENGES[currentChallengeIndex % RAID_CHALLENGES.length];
+  const [isRaidChestOpen, setIsRaidChestOpen] = useState<boolean>(false);
   const [raidProbesLeft, setRaidProbesLeft] = useState<number>(3);
   const [raidGuessedIds, setRaidGuessedIds] = useState<string[]>([]);
   const [raidIsWon, setRaidIsWon] = useState<boolean>(false);
+  const [claimedChallengeIds, setClaimedChallengeIds] = useState<string[]>([]);
 
   // Modals & Store State
   const [isStoreOpen, setIsStoreOpen] = useState<boolean>(false);
   const [storeTab, setStoreTab] = useState<'probes' | 'coins'>('probes');
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(
+    typeof saved.walletAddress === 'string' ? saved.walletAddress : null
+  );
   const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
-  // Activity Feed
-  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>(INITIAL_ACTIVITY);
+  // Activity Feed & Custom Emblem
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>(
+    Array.isArray(saved.activityFeed) && saved.activityFeed.length > 0
+      ? saved.activityFeed
+      : INITIAL_ACTIVITY
+  );
   const [customEmblemSrc, setCustomEmblemSrc] = useState<string | null>(null);
 
-  // File handler for optional local image testing
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 3200);
+  };
+
+  // Sync sound setting
+  useEffect(() => {
+    setSoundEnabled(soundOn);
+  }, [soundOn]);
+
+  // Initialize Telegram Mini-App SDK & parse deep-link challenge (?startapp=...)
+  useEffect(() => {
+    initTelegramWebApp();
+    const user = getTelegramUser();
+    if (user) {
+      setTelegramUsername(user.username ? `@${user.username}` : user.first_name);
+    }
+
+    const parsed = getIncomingStartChallenge();
+    if (parsed) {
+      const matchedZone =
+        HIDING_ZONES.find((z) => z.id === parsed.zoneId) ||
+        HIDING_ZONES.find(
+          (z) => z.name.toLowerCase() === (parsed.zoneName || '').toLowerCase()
+        ) ||
+        HIDING_ZONES[0];
+
+      const linkedChallenge: RaidChallenge = {
+        id: `link-${Date.now()}`,
+        challenger: parsed.challenger,
+        avatar: '🎯',
+        bounty: parsed.bounty,
+        clue: `Tagged challenge from ${parsed.challenger} — crack their ${parsed.bounty} MCH vault in 3 probes!`,
+        targetZoneId: matchedZone.id,
+      };
+      setIncomingChallenge(linkedChallenge);
+      setActiveTab('raid');
+      setRaidProbesLeft(3);
+      setRaidGuessedIds([]);
+      setRaidIsWon(false);
+      setIsRaidChestOpen(false);
+      showToast(`Challenge loaded for ${parsed.challenger} (${parsed.bounty} MCH)!`);
+    }
+  }, []);
+
+  // Persist user progress cleanly
+  useEffect(() => {
+    try {
+      const payload: PersistedState = {
+        mchBalance,
+        stashedBounty,
+        streak,
+        walletAddress,
+        activityFeed: activityFeed.slice(0, 15),
+        soundOn,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [mchBalance, stashedBounty, streak, walletAddress, activityFeed, soundOn]);
+
+  const activeRaidChallenge: RaidChallenge =
+    incomingChallenge || RAID_CHALLENGES[currentChallengeIndex % RAID_CHALLENGES.length];
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
       setCustomEmblemSrc(url);
+      showToast('Custom chest emblem updated!');
     }
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const handleToggleSound = () => {
+    setSoundOn((prev) => {
+      const next = !prev;
+      setSoundEnabled(next);
+      if (next) playSound('tap');
+      showToast(next ? 'Sound effects enabled' : 'Sound effects muted');
+      return next;
+    });
   };
 
-  // Open Store Handler
   const handleOpenStore = (tab: 'probes' | 'coins' = 'probes') => {
     setStoreTab(tab);
     setIsStoreOpen(true);
   };
 
-  // Purchase Success Callback
   const handlePurchaseSuccess = (pack: StorePack, paymentMethod: string) => {
     playSound('win');
     confetti({
@@ -83,48 +216,76 @@ export const App: React.FC = () => {
       if (pack.streakBoost) {
         setStreak((prev) => prev + (pack.streakBoost || 0));
       }
-      showToast(`Purchased ${pack.name} via ${paymentMethod}! Probes refilled.`);
+      showToast(`Credited ${pack.name} via ${paymentMethod}!`);
     } else if (pack.type === 'coins') {
       const addedCoins = pack.coins || 1000;
       setMchBalance((prev) => prev + addedCoins);
-      showToast(`Purchased ${pack.name} via ${paymentMethod}! Added to balance.`);
+      showToast(`Credited ${pack.name} via ${paymentMethod}!`);
     }
   };
 
-  // Coin Loading Handlers (Step 01 inside the Master Treasure Box)
+  // Free starter drop when user runs completely dry
+  const handleClaimFreeCoins = () => {
+    setMchBalance((prev) => prev + 200);
+    confetti({ particleCount: 40, spread: 60, origin: { y: 0.5 } });
+    showToast('Harvested +200 MCH starter drop!');
+  };
+
+  // Coin Loading Handlers (Step 01)
   const handleAddCoins = (amount: number) => {
     if (mchBalance < amount) {
-      showToast('Not enough MCH Coins! Opening store...');
+      showToast('Not enough MCH Coins! Opening Coin Store...');
       handleOpenStore('coins');
       return;
     }
     setMchBalance((prev) => prev - amount);
     setStashedBounty((prev) => prev + amount);
-    setIsChestOpen(true); // Automatically opens chest if closed
+    setIsHideChestOpen(true);
   };
 
   const handleAddMaxHalf = () => {
     const half = Math.floor(mchBalance / 2);
-    if (half <= 0) return;
+    if (half <= 0) {
+      showToast('Balance too low! Claim free harvest or visit Store.');
+      return;
+    }
     setMchBalance((prev) => prev - half);
     setStashedBounty((prev) => prev + half);
-    setIsChestOpen(true);
+    setIsHideChestOpen(true);
   };
 
   const handleResetStash = () => {
     if (stashedBounty <= 0) return;
     setMchBalance((prev) => prev + stashedBounty);
     setStashedBounty(0);
-    showToast('Reset! Returned stashed bounty to balance.');
+    showToast('Returned stashed bounty to your MCH balance.');
   };
 
   // Lock Stash & Tag CTA (Step 03)
   const handleLockAndTag = () => {
+    if (stashedBounty <= 0) {
+      showToast('Load at least +25 MCH into the vault first!');
+      return;
+    }
+
     const targetFriend = customFriend.trim()
-      ? (customFriend.startsWith('@') ? customFriend : `@${customFriend}`)
+      ? customFriend.startsWith('@')
+        ? customFriend
+        : `@${customFriend}`
       : selectedFriend;
 
-    // Confetti effect
+    const lockedAmount = stashedBounty;
+    const lockedClue = clue.trim() || `Hidden deep inside ${selectedZone.name}...`;
+
+    // Snapshot locked challenge before resetting bounty so ShareModal shows exact values
+    setLastLockedChallenge({
+      amount: lockedAmount,
+      zoneId: selectedZone.id,
+      locationName: selectedZone.name,
+      friendHandle: targetFriend,
+      clue: lockedClue,
+    });
+
     confetti({
       particleCount: 65,
       spread: 70,
@@ -133,33 +294,35 @@ export const App: React.FC = () => {
 
     playSound('lock');
 
-    // Add to Live Squad Feed with Cyan dot
     const newActivity: ActivityItem = {
       id: `act-${Date.now()}`,
-      fullText: `You hid ${stashedBounty} MCH in ${selectedZone.name} and tagged ${targetFriend}`,
+      fullText: `You hid ${lockedAmount} MCH in ${selectedZone.name} and tagged ${targetFriend}`,
       timestamp: 'Just now',
       dotColor: 'cyan',
       type: 'stash',
     };
-    setActivityFeed((prev) => [newActivity, ...prev]);
+    setActivityFeed((prev) => [newActivity, ...prev.slice(0, 14)]);
 
-    // Open Share Modal
     setIsShareModalOpen(true);
-
-    // Increment streak
     setStreak((prev) => prev + 1);
-
-    // Reset stashed bounty for next round
     setStashedBounty(0);
+    setIsHideChestOpen(false);
   };
 
-  // Claim Bounty from Raid Mode
-  const handleClaimRaidBounty = (bounty: number, locationName: string, challenger: string) => {
+  // Claim Bounty from Raid Mode (guarded against double-claim)
+  const handleClaimRaidBounty = (
+    bounty: number,
+    locationName: string,
+    challenger: string,
+    challengeId: string
+  ) => {
+    if (claimedChallengeIds.includes(challengeId)) return;
+    setClaimedChallengeIds((prev) => [...prev, challengeId]);
+
     setMchBalance((prev) => prev + bounty);
     setStreak((prev) => prev + 1);
-    setIsChestOpen(true);
+    setIsRaidChestOpen(true);
 
-    // Add to Live Squad Feed with Gold dot
     const newActivity: ActivityItem = {
       id: `raid-${Date.now()}`,
       fullText: `You cracked ${challenger}'s stash in ${locationName} (+${bounty} MCH)`,
@@ -167,21 +330,46 @@ export const App: React.FC = () => {
       dotColor: 'gold',
       type: 'raid',
     };
-    setActivityFeed((prev) => [newActivity, ...prev]);
+    setActivityFeed((prev) => [newActivity, ...prev.slice(0, 14)]);
+    showToast(`Cracked ${challenger}'s vault! +${bounty} MCH added.`);
   };
 
-  const effectiveFriendDisplay = customFriend.trim()
-    ? (customFriend.startsWith('@') ? customFriend : `@${customFriend}`)
-    : selectedFriend;
+  const handleCycleChallenge = () => {
+    if (incomingChallenge) {
+      setIncomingChallenge(null);
+    } else {
+      setCurrentChallengeIndex((prev) => prev + 1);
+    }
+    setRaidProbesLeft(3);
+    setRaidGuessedIds([]);
+    setRaidIsWon(false);
+    setIsRaidChestOpen(false);
+  };
+
+  const handleResetProgress = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setMchBalance(1000);
+    setStashedBounty(100);
+    setStreak(2);
+    setWalletAddress(null);
+    setActivityFeed(INITIAL_ACTIVITY);
+    setIsHideChestOpen(false);
+    setIsRaidChestOpen(false);
+    setRaidProbesLeft(3);
+    setRaidGuessedIds([]);
+    setRaidIsWon(false);
+    setClaimedChallengeIds([]);
+    setIncomingChallenge(null);
+    showToast('Game progress reset to 1,000 MCH!');
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans cyber-bg-pattern no-select selection:bg-[#00f0ff]/30">
-      {/* Mobile Viewport Container */}
-      <div className="max-w-md mx-auto min-h-screen flex flex-col pb-8 relative">
-        
+      {/* Mobile Viewport Container with iOS Safe Area padding */}
+      <div className="max-w-md mx-auto min-h-screen flex flex-col pb-[max(2rem,env(safe-area-inset-bottom))] relative">
         {/* Floating Toast Notification */}
         {toastMessage && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
             <div className="bg-[#0d1222]/95 border border-[#00f0ff] rounded-2xl px-4 py-3 shadow-[0_0_24px_rgba(0,240,255,0.4)] flex items-center gap-2.5">
               <span className="text-lg">⚡</span>
               <p className="font-bold text-xs text-white leading-snug">{toastMessage}</p>
@@ -194,16 +382,21 @@ export const App: React.FC = () => {
           walletAddress={walletAddress}
           onConnectWallet={() => setIsWalletModalOpen(true)}
           customImageSrc={customEmblemSrc}
+          soundOn={soundOn}
+          onToggleSound={handleToggleSound}
+          onOpenHelp={() => setIsHelpOpen(true)}
+          telegramUsername={telegramUsername}
         />
 
         {/* Inner Content Area */}
         <main className="flex-1 px-3.5 pt-3 space-y-3.5">
-          
           {/* 2. Player Stats Row with "+ Buy Plays / Coins" Button */}
-          <PlayerStats 
-            mchBalance={mchBalance} 
-            streak={streak} 
+          <PlayerStats
+            mchBalance={mchBalance}
+            streak={streak}
+            stashedBounty={stashedBounty}
             onOpenStore={handleOpenStore}
+            onClaimFreeCoins={handleClaimFreeCoins}
           />
 
           {/* 3. Mode Switcher Tabs */}
@@ -212,12 +405,10 @@ export const App: React.FC = () => {
           {/* ================= VIEW 1: HIDE & TAG FRIEND ================= */}
           {activeTab === 'hide' && (
             <div className="space-y-3.5 animate-in fade-in duration-200">
-              {/* EXACT Box Container from Reference Image 2:
-                  Contains Top Bar, Animated Chest with Official Tree MCH Logo,
-                  Bounty Status Bar with Reset, and Step 01 Coin Loading Controls! */}
               <TreasureChest2D
-                isOpen={isChestOpen}
-                onToggle={() => setIsChestOpen((prev) => !prev)}
+                mode="hide"
+                isOpen={isHideChestOpen}
+                onToggle={() => setIsHideChestOpen((prev) => !prev)}
                 stashedBounty={stashedBounty}
                 bonusStealth={selectedZone.bonusStealth}
                 onReset={handleResetStash}
@@ -227,13 +418,14 @@ export const App: React.FC = () => {
                 onAddMaxHalf={handleAddMaxHalf}
               />
 
-              {/* Step 02 Pick Hiding Zone (8 Spots) */}
               <HidingZoneStep
                 selectedZoneId={selectedZone.id}
-                onSelectZone={(zone) => setSelectedZone(zone)}
+                onSelectZone={(zone) => {
+                  triggerHaptic('selection');
+                  setSelectedZone(zone);
+                }}
               />
 
-              {/* Step 03 Drop Clue & Tag Friend */}
               <DropClueStep
                 clue={clue}
                 onClueChange={setClue}
@@ -242,6 +434,8 @@ export const App: React.FC = () => {
                 customFriend={customFriend}
                 onCustomFriendChange={setCustomFriend}
                 stashedBounty={stashedBounty}
+                mchBalance={mchBalance}
+                onQuickLoad={handleAddCoins}
                 onLockAndTag={handleLockAndTag}
               />
             </div>
@@ -250,28 +444,27 @@ export const App: React.FC = () => {
           {/* ================= VIEW 2: RAID FRIEND'S STASH ================= */}
           {activeTab === 'raid' && (
             <div className="space-y-3.5 animate-in fade-in duration-200">
-              {/* Keep the interactive 2D Treasure Chest at the top */}
               <TreasureChest2D
-                isOpen={isChestOpen}
-                onToggle={() => setIsChestOpen((prev) => !prev)}
-                stashedBounty={currentRaidChallenge.bounty}
-                bonusStealth="+20% Radar Bonus"
+                mode="raid"
+                isOpen={isRaidChestOpen}
+                onToggle={() => setIsRaidChestOpen((prev) => !prev)}
+                stashedBounty={activeRaidChallenge.bounty}
+                raidMeta={{
+                  challenger: activeRaidChallenge.challenger,
+                  isWon: raidIsWon,
+                }}
                 onReset={() => {}}
                 customImageSrc={customEmblemSrc}
-                mchBalance={mchBalance}
               />
 
-              {/* Target Info Header, Clue Box, Scanner Grid & Out of Probes Refill */}
-              <RaidView 
+              <RaidView
+                challenge={activeRaidChallenge}
+                challengeNumber={(currentChallengeIndex % RAID_CHALLENGES.length) + 1}
+                totalChallenges={RAID_CHALLENGES.length}
+                isIncomingLinkChallenge={Boolean(incomingChallenge)}
                 onClaimBounty={handleClaimRaidBounty}
-                onChestCrack={() => setIsChestOpen(true)}
-                currentChallengeIndex={currentChallengeIndex}
-                onCycleChallenge={() => {
-                  setCurrentChallengeIndex((prev) => prev + 1);
-                  setRaidProbesLeft(3);
-                  setRaidGuessedIds([]);
-                  setRaidIsWon(false);
-                }}
+                onChestCrack={() => setIsRaidChestOpen(true)}
+                onCycleChallenge={handleCycleChallenge}
                 probesLeft={raidProbesLeft}
                 setProbesLeft={setRaidProbesLeft}
                 guessedIds={raidGuessedIds}
@@ -285,28 +478,9 @@ export const App: React.FC = () => {
 
           {/* Persistent Bottom Component: Recent Raids & Tags (Live Squad Feed) */}
           <LiveSquadFeed activity={activityFeed} />
-
-          {/* Quick Emblem Asset Tester / Support for IMG_0900.jpeg */}
-          <div className="flex items-center justify-between px-2 pt-1 text-[11px] text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <span>Emblem Asset:</span>
-              <span className="text-slate-300 font-mono">
-                {customEmblemSrc ? 'Custom Uploaded' : 'Official IMG_0900.jpeg Logo'}
-              </span>
-            </span>
-            <label className="text-[#00f0ff] hover:underline cursor-pointer font-medium">
-              Change Image
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </label>
-          </div>
         </main>
 
-        {/* Buy Plays & MCH Coins Payment Store Modal */}
+        {/* Modals */}
         <BuyStoreModal
           isOpen={isStoreOpen}
           onClose={() => setIsStoreOpen(false)}
@@ -314,25 +488,43 @@ export const App: React.FC = () => {
           onPurchaseSuccess={handlePurchaseSuccess}
         />
 
-        {/* Connect Wallet Modal */}
         <ConnectWalletModal
           isOpen={isWalletModalOpen}
           onClose={() => setIsWalletModalOpen(false)}
           walletAddress={walletAddress}
-          onConnect={(addr) => setWalletAddress(addr)}
-          onDisconnect={() => setWalletAddress(null)}
+          onConnect={(addr, provider) => {
+            setWalletAddress(addr);
+            showToast(`Connected ${provider} (${addr})`);
+          }}
+          onDisconnect={() => {
+            setWalletAddress(null);
+            showToast('Wallet disconnected');
+          }}
         />
 
-        {/* Challenge Share Modal */}
         <ChallengeShareModal
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
-          stashedAmount={stashedBounty || 150}
-          locationName={selectedZone.name}
-          friendHandle={effectiveFriendDisplay}
-          clue={clue}
+          stashedAmount={lastLockedChallenge?.amount ?? 100}
+          zoneId={lastLockedChallenge?.zoneId ?? selectedZone.id}
+          locationName={lastLockedChallenge?.locationName ?? selectedZone.name}
+          friendHandle={lastLockedChallenge?.friendHandle ?? selectedFriend}
+          clue={lastLockedChallenge?.clue ?? clue}
         />
 
+        <HelpSettingsModal
+          isOpen={isHelpOpen}
+          onClose={() => setIsHelpOpen(false)}
+          soundOn={soundOn}
+          onToggleSound={handleToggleSound}
+          customEmblemSrc={customEmblemSrc}
+          onImageUpload={handleImageUpload}
+          onResetEmblem={() => {
+            setCustomEmblemSrc(null);
+            showToast('Restored official MCH logo');
+          }}
+          onResetProgress={handleResetProgress}
+        />
       </div>
     </div>
   );
