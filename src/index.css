@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0a0b14;
+  color: #ffffff;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Telegram Mini-App Safe Area & No Select */
+.no-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Subtle Cyber-Botanical Background Grid & Radial Nebulas */
+.cyber-bg-pattern {
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 25%, rgba(168, 85, 247, 0.1) 0%, transparent 45%),
+    radial-gradient(circle at 50% 85%, rgba(236, 72, 153, 0.08) 0%, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 2.5s infinite;
+}
+
+/* User Feature: "100 MCH Ready" emerges centered directly over chest and vanishes slowly */
+@keyframes chestReadyEmergeVanish {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 14px) scale(0.85);
+    filter: drop-shadow(0 0 4px #00f0ff);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, 0px) scale(1.06);
+    filter: drop-shadow(0 0 16px #00f0ff) drop-shadow(0 0 28px rgba(0, 240, 255, 0.85));
+  }
+  35% {
+    opacity: 1;
+    transform: translate(-50%, -2px) scale(1);
+    filter: drop-shadow(0 0 12px #00f0ff) drop-shadow(0 0 22px rgba(0, 240, 255, 0.75));
+  }
+  65% {
+    opacity: 0.95;
+    transform: translate(-50%, -6px) scale(1);
+    filter: drop-shadow(0 0 10px #00f0ff);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -26px) scale(0.92);
+    filter: drop-shadow(0 0 2px transparent);
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+.animate-ready-emerge-vanish {
+  animation: chestReadyEmergeVanish 2.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom scrollbar for mobile feed */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}

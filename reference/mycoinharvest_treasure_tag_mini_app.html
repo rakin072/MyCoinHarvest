@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MyCoinHarvest — Treasure Tag</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Telegram WebApp JS -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Crisp Modern Fonts: Space Grotesk & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Tone.js for crisp synthesized audio cues -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            display: ['Space Grotesk', 'sans-serif'],
+          },
+          colors: {
+            obsidian: '#05060a',
+            surface: '#0d111e',
+            card: '#13192c',
+            cyanGlow: '#14e8ff',
+            violetGlow: '#9b5de5',
+            magentaGlow: '#ff2a85',
+            goldMch: '#ffd166',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    input {
+      user-select: text;
+    }
+
+    body {
+      background-color: #05060a;
+      color: #ffffff;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow-x: hidden;
+      margin: 0;
+    }
+
+    /* Ambient Cyber-Botanical Nebula Background */
+    .bg-cyber-arena {
+      background-image:
+        radial-gradient(circle at 18% 10%, rgba(20, 232, 255, 0.13) 0%, transparent 42%),
+        radial-gradient(circle at 84% 18%, rgba(155, 93, 229, 0.15) 0%, transparent 45%),
+        radial-gradient(circle at 50% 88%, rgba(255, 42, 133, 0.12) 0%, transparent 48%);
+    }
+
+    /* Seamless Circular Frame for Official IMG_0900.jpeg Logo */
+    .mch-logo-frame {
+      background-color: #000000;
+      object-fit: cover;
+      object-position: center 46%;
+      border-radius: 9999px;
+      box-shadow:
+        -4px 0 12px rgba(20, 232, 255, 0.45),
+        4px 0 12px rgba(255, 42, 133, 0.45);
+    }
+
+    /* Volumetric Spinning Rays Behind the Central Treasure Chest */
+    @keyframes spinRays {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .chest-rays {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 260px;
+      height: 260px;
+      background: repeating-conic-gradient(
+        from 0deg,
+        rgba(20, 232, 255, 0.2) 0deg 10deg,
+        transparent 10deg 24deg,
+        rgba(255, 42, 133, 0.18) 24deg 34deg,
+        transparent 34deg 48deg
+      );
+      border-radius: 9999px;
+      filter: blur(5px);
+      animation: spinRays 18s linear infinite;
+      pointer-events: none;
+    }
+
+    /* Subtle Hover Float for Treasure Chest */
+    @keyframes floatChest {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .chest-float {
+      animation: floatChest 3.2s ease-in-out infinite;
+    }
+
+    /* Chest Lid Pop Animation */
+    .chest-lid {
+      transform-origin: 50% 44%;
+      transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .chest-open .chest-lid {
+      transform: translateY(-15px) scale(1.04);
+    }
+
+    /* User Feature: "100 MCH Ready" emerges centered directly over chest and vanishes slowly */
+    @keyframes readyEmergeAndVanish {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, 14px) scale(0.85);
+        filter: drop-shadow(0 0 4px #14e8ff);
+      }
+      16% {
+        opacity: 1;
+        transform: translate(-50%, 0px) scale(1.06);
+        filter: drop-shadow(0 0 16px #14e8ff) drop-shadow(0 0 28px rgba(20, 232, 255, 0.85));
+      }
+      35% {
+        opacity: 1;
+        transform: translate(-50%, -2px) scale(1);
+        filter: drop-shadow(0 0 12px #14e8ff) drop-shadow(0 0 22px rgba(20, 232, 255, 0.75));
+      }
+      65% {
+        opacity: 0.95;
+        transform: translate(-50%, -6px) scale(1);
+        filter: drop-shadow(0 0 10px #14e8ff);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -26px) scale(0.92);
+        filter: drop-shadow(0 0 2px transparent);
+        pointer-events: none;
+        visibility: hidden;
+      }
+    }
+
+    .animate-ready-emerge-vanish {
+      animation: readyEmergeAndVanish 2.6s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    }
+
+    /* Flying Coin Arc into Chest */
+    @keyframes flyCoinIn {
+      0% {
+        opacity: 1;
+        transform: translate(var(--start-x), var(--start-y)) scale(1.1);
+      }
+      70% {
+        opacity: 1;
+        transform: translate(0px, -22px) scale(0.95);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(0px, 8px) scale(0.35);
+      }
+    }
+
+    .flying-coin {
+      position: fixed;
+      z-index: 999;
+      pointer-events: none;
+      animation: flyCoinIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    /* Floating Pop Feedback */
+    @keyframes popFeedback {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(0.75); }
+      45% { opacity: 1; transform: translate(-50%, -32px) scale(1.15); }
+      100% { opacity: 0; transform: translate(-50%, -64px) scale(0.95); }
+    }
+
+    .pop-text {
+      position: fixed;
+      z-index: 1000;
+      pointer-events: none;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+      animation: popFeedback 0.8s ease-out forwards;
+    }
+
+    /* Victory Particle Confetti */
+    @keyframes particleDrop {
+      0% { transform: translateY(-15px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(360px) rotate(540deg); opacity: 0; }
+    }
+
+    .confetti-bit {
+      position: fixed;
+      top: 10%;
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      z-index: 998;
+      pointer-events: none;
+      animation: particleDrop 1.3s ease-in forwards;
+    }
+
+    /* Shimmer Effect */
+    @keyframes shimmerAnim {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(200%); }
+    }
+    .shimmer-active::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+      transform: translateX(-100%);
+      animation: shimmerAnim 2.2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-obsidian bg-cyber-arena min-h-screen flex flex-col items-center">
+
+  <!-- Reusable SVG Fallback if IMG_0900.jpeg is unavailable -->
+  <svg width="0" height="0" class="hidden" aria-hidden="true">
+    <defs>
+      <linearGradient id="mchGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#14e8ff" />
+        <stop offset="50%" stop-color="#9b5de5" />
+        <stop offset="100%" stop-color="#ff2a85" />
+      </linearGradient>
+      <symbol id="mch-fallback-icon" viewBox="0 0 120 120">
+        <rect width="120" height="120" rx="60" fill="#000000" />
+        <path d="M60 44 L60 28 M60 36 L44 25 M60 34 L76 24" stroke="url(#mchGrad)" stroke-width="3.5" stroke-linecap="round" />
+        <text x="60" y="66" text-anchor="middle" fill="url(#mchGrad)" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="24">MCH</text>
+        <path d="M60 72 L60 90 M60 79 L44 90 M60 79 L76 90" stroke="url(#mchGrad)" stroke-width="3" stroke-linecap="round" />
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- Mobile-First Telegram Mini App Shell (max-width 440px) -->
+  <div class="w-full max-w-[440px] min-h-screen flex flex-col pb-8">
+
+    <!-- Top Notification Toast -->
+    <div id="toast-banner" class="fixed top-3 left-1/2 -translate-x-1/2 w-[92%] max-w-[408px] z-50 transition-all duration-300 -translate-y-32 opacity-0 pointer-events-none">
+      <div class="bg-[#0d1222]/95 border border-cyanGlow/70 rounded-2xl px-4 py-3 shadow-[0_0_24px_rgba(20,232,255,0.4)] flex items-center gap-2.5">
+        <span id="toast-icon" class="text-lg">⚡</span>
+        <p id="toast-text" class="font-semibold text-xs text-white leading-snug">Challenge link copied!</p>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- 1. BRANDING HEADER, LIVE BALANCE & CONNECT WALLET         -->
+    <!-- ========================================================= -->
+    <header class="sticky top-0 z-30 px-4 pt-3 pb-3 bg-obsidian/90 backdrop-blur-md border-b border-white/10">
+      <div class="flex items-center justify-between gap-2">
+        <!-- Brand Logo + Title -->
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-10 h-10 rounded-full p-[2px] bg-gradient-to-r from-cyanGlow via-violetGlow to-magentaGlow shrink-0">
+            <img src="../public/IMG_0900.jpeg" alt="MyCoinHarvest Logo"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+              class="w-full h-full mch-logo-frame" />
+            <svg class="w-full h-full hidden"><use href="#mch-fallback-icon"></use></svg>
+          </div>
+          <div class="leading-tight truncate">
+            <div class="font-display font-bold text-base bg-gradient-to-r from-cyanGlow via-violetGlow to-magentaGlow bg-clip-text text-transparent">
+              MyCoinHarvest
+            </div>
+            <div class="text-[11px] text-slate-400 font-medium truncate">mycoinharvest.com • Treasure Tag</div>
+          </div>
+        </div>
+
+        <!-- Top-Right Connect Wallet Button -->
+        <button onclick="openWalletModal()" class="flex items-center gap-1.5 bg-gradient-to-r from-violetGlow/25 to-cyanGlow/20 hover:from-violetGlow/35 hover:to-cyanGlow/30 border border-cyanGlow/45 rounded-full px-3 py-1.5 text-xs font-bold text-white transition active:scale-95 shrink-0">
+          <span id="wallet-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span id="wallet-label">Connect Wallet</span>
+        </button>
+      </div>
+
+      <!-- Live Balance & Streak Strip + Glowing "+ Buy Plays / Coins" Button -->
+      <div class="mt-2.5 grid grid-cols-2 gap-2">
+        <div class="bg-surface/90 border border-white/10 rounded-xl px-3 py-1.5 flex items-center justify-between">
+          <span class="text-[11px] text-slate-400 font-semibold">MCH Coins</span>
+          <span id="mch-balance" class="font-display font-bold text-sm text-goldMch">1,000 MCH</span>
+        </div>
+        <div class="bg-surface/90 border border-white/10 rounded-xl px-3 py-1.5 flex items-center justify-between">
+          <span id="rank-badge" class="text-[11px] font-bold text-cyanGlow">Scout Rank</span>
+          <span id="streak-badge" class="font-display font-bold text-xs text-magentaGlow">🔥 2x Streak</span>
+        </div>
+      </div>
+
+      <!-- Trigger 1: Glowing Store Pill Button -->
+      <div class="mt-2">
+        <button onclick="openStoreModal()" 
+          class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-[#ffd166]/20 via-[#14e8ff]/20 to-[#ff2a85]/20 hover:from-[#ffd166]/30 hover:to-[#ff2a85]/30 border border-[#ffd166]/60 text-xs font-display font-bold text-white shadow-[0_0_14px_rgba(255,209,102,0.3)] flex items-center justify-center gap-2 transition active:scale-[0.98] relative overflow-hidden shimmer-active">
+          <span class="text-sm">⚡</span>
+          <span>+ Buy Plays / Coins</span>
+          <span class="text-[10px] bg-black/60 text-[#ffd166] px-2 py-0.5 rounded-full border border-[#ffd166]/40 font-mono font-semibold">Cards • Stars • Apple Pay</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ========================================================= -->
+    <!-- MAIN SINGLE-SCREEN TACTICAL ARENA                         -->
+    <!-- ========================================================= -->
+    <main class="flex-1 px-4 pt-3.5 space-y-3.5">
+
+      <!-- Single-Screen Mode Toggle Pill -->
+      <div class="grid grid-cols-2 gap-1.5 p-1 bg-surface border border-white/10 rounded-2xl">
+        <button id="tab-hide" onclick="switchMode('hide')"
+          class="py-2.5 px-3 rounded-xl font-display font-bold text-xs transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-cyanGlow/25 via-violetGlow/25 to-magentaGlow/25 border border-cyanGlow/50 text-white shadow-[0_0_15px_rgba(20,232,255,0.2)]">
+          <span>🔒</span>
+          <span>Hide & Tag Friend</span>
+        </button>
+        <button id="tab-raid" onclick="switchMode('raid')"
+          class="py-2.5 px-3 rounded-xl font-display font-bold text-xs transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+          <span>📡</span>
+          <span>Raid Friend's Stash</span>
+        </button>
+      </div>
+
+      <!-- ======================================================= -->
+      <!-- CENTRAL MASTER MYCOINHARVEST TREASURE CHEST BOX (Image 2) -->
+      <!-- ======================================================= -->
+      <section class="relative rounded-[28px] p-[2px] bg-gradient-to-r from-cyanGlow via-violetGlow to-magentaGlow shadow-[0_0_30px_rgba(20,232,255,0.35)] transition-all">
+        <div class="bg-[#0b0e1b] rounded-[26px] p-3.5 sm:p-4 flex flex-col space-y-3.5 overflow-hidden relative">
+          
+          <!-- Top Bar: TAP CHEST TO OPEN / CLOSE & LOADED: 150 MCH -->
+          <div class="w-full flex items-center justify-between gap-2 z-10">
+            <button onclick="peekChest()"
+              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#062430] border border-cyanGlow text-cyanGlow text-[11px] font-display font-bold tracking-wider uppercase transition hover:brightness-125 active:scale-95 shadow-[0_0_10px_rgba(20,232,255,0.3)]">
+              <span>TAP CHEST TO OPEN / CLOSE</span>
+            </button>
+            <div class="px-3.5 py-1.5 rounded-full bg-[#1e1338] border border-violetGlow text-white text-[11px] font-display font-bold tracking-wide shadow-[0_0_10px_rgba(168,85,247,0.35)]">
+              <span>LOADED: <span id="chest-loaded-text">150</span> MCH</span>
+            </div>
+          </div>
+
+          <!-- Inner Chest Stage Viewport -->
+          <div onclick="peekChest()" role="button" tabindex="0" aria-label="Interactive Treasure Chest"
+            class="relative w-full rounded-2xl bg-gradient-to-b from-[#060814] to-[#020308] border border-white/5 py-4 px-2 flex flex-col items-center justify-center cursor-pointer select-none overflow-hidden group">
+            
+            <!-- Volumetric Radial Light Rays -->
+            <div class="absolute inset-0 pointer-events-none opacity-40">
+              <div class="chest-rays"></div>
+            </div>
+
+            <!-- Floating Neon Diamonds & Sparkle Stars (Image 2) -->
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div class="absolute top-4 left-6 w-4 h-4 bg-cyanGlow/20 border-2 border-cyanGlow shadow-[0_0_12px_#14e8ff] transform -rotate-12 skew-x-12 animate-pulse"></div>
+              <div class="absolute top-6 right-6 w-4 h-4 bg-magentaGlow/20 border-2 border-magentaGlow shadow-[0_0_12px_#ff2a85] transform rotate-12 -skew-x-12 animate-pulse"></div>
+              <div class="absolute bottom-6 left-8 text-goldMch text-xs font-bold drop-shadow-[0_0_6px_#ffd166]">✦</div>
+              <div class="absolute bottom-6 right-8 text-cyanGlow text-xs font-bold drop-shadow-[0_0_6px_#14e8ff]">✦</div>
+            </div>
+
+            <!-- Neon 2D Chest Graphics -->
+            <div id="hero-chest" class="chest-float relative z-10 w-full max-w-[290px] h-[195px] flex items-center justify-center">
+              <!-- "100 MCH Ready" text above chest (Exact Image from User) -->
+              <div id="chest-ready-badge" class="absolute -top-1 sm:-top-2 left-1/2 -translate-x-1/2 z-30 font-display font-extrabold text-sm sm:text-base text-cyanGlow opacity-0 pointer-events-none select-none whitespace-nowrap" style="text-shadow: 0 0 10px #14e8ff, 0 0 20px #14e8ff, 0 0 35px rgba(20, 232, 255, 0.85);">
+                100 MCH Ready
+              </div>
+              <svg viewBox="0 0 320 220" class="w-full h-full drop-shadow-[0_12px_24px_rgba(0,0,0,0.95)] overflow-visible">
+                <defs>
+                  <linearGradient id="goldBarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#fef08a" />
+                    <stop offset="25%" stop-color="#ffd166" />
+                    <stop offset="75%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#b45309" />
+                  </linearGradient>
+                  <linearGradient id="lidNeonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#14e8ff" />
+                    <stop offset="50%" stop-color="#9b5de5" />
+                    <stop offset="100%" stop-color="#ff2a85" />
+                  </linearGradient>
+                </defs>
+
+                <!-- Concentric Ground Rings -->
+                <ellipse cx="160" cy="194" rx="105" ry="13" fill="none" stroke="#14e8ff" stroke-width="2.5" opacity="0.85" />
+                <ellipse cx="160" cy="194" rx="82" ry="9" fill="none" stroke="#ff2a85" stroke-width="2" opacity="0.9" />
+
+                <!-- Lower Chest Body -->
+                <path d="M85 108 L235 108 L235 152 Q235 166 222 166 L98 166 Q85 166 85 152 Z"
+                  fill="#080b18" stroke="#182038" stroke-width="1.5" />
+                <rect x="85" y="108" width="8" height="48" rx="4" fill="#14e8ff" />
+                <rect x="227" y="108" width="8" height="48" rx="4" fill="#ff2a85" />
+                <path d="M94 166 L226 166" stroke="#ff2a85" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
+                <rect x="80" y="102" width="160" height="11" rx="5.5" fill="url(#goldBarGrad)" stroke="#f59e0b" stroke-width="1" />
+
+                <!-- Animated Lid Group -->
+                <g class="chest-lid">
+                  <path d="M85 82 C85 46, 160 40, 160 40 C160 40, 235 46, 235 82 Z"
+                    fill="#0b0e1b" stroke="url(#lidNeonGrad)" stroke-width="2.5" />
+                  <path d="M104 80 Q106 58 114 55" stroke="#14e8ff" stroke-width="4" stroke-linecap="round" fill="none" />
+                  <path d="M156 80 Q160 52 164 80" stroke="#9b5de5" stroke-width="4" stroke-linecap="round" fill="none" />
+                  <path d="M216 80 Q214 58 206 55" stroke="#ff2a85" stroke-width="4" stroke-linecap="round" fill="none" />
+                  <rect x="80" y="77" width="160" height="11" rx="5.5" fill="url(#goldBarGrad)" stroke="#f59e0b" stroke-width="1" />
+                </g>
+
+                <!-- Central Medallion Base Socket -->
+                <circle cx="160" cy="132" r="30" fill="#000000" stroke="#f59e0b" stroke-width="2" />
+              </svg>
+
+              <!-- Official MCH Logo Emblem inside Gold Medallion (Image 1 Upload) -->
+              <div class="absolute top-[102px] w-[58px] h-[58px] rounded-full overflow-hidden bg-black flex items-center justify-center pointer-events-none shadow-[0_0_18px_rgba(20,232,255,0.7)] border-2 border-goldMch">
+                <img src="../public/IMG_0900.jpeg" alt="MCH Lock"
+                  onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                  class="w-full h-full object-cover mix-blend-lighten scale-110" style="object-position: center 46%;" />
+                <svg class="w-full h-full hidden"><use href="#mch-fallback-icon"></use></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bounty Status Bar (Image 2) -->
+          <div class="w-full rounded-2xl bg-[#080b16] border border-goldMch/60 px-4 py-2.5 flex items-center justify-between gap-2 shadow-[0_0_12px_rgba(255,209,102,0.2)]">
+            <div class="flex flex-col text-[10px] sm:text-[11px] font-extrabold text-slate-400 tracking-wider uppercase leading-tight">
+              <span>STASHED</span>
+              <span>BOUNTY:</span>
+            </div>
+            <div class="flex flex-col text-lg sm:text-xl font-display font-black text-goldMch leading-none drop-shadow-[0_0_8px_rgba(255,209,102,0.4)]">
+              <span id="stashed-bounty-number">150</span>
+              <span>MCH</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div id="chest-multiplier-badge" class="px-3 py-1 rounded-full bg-[#062430] border border-cyanGlow text-cyanGlow text-[11px] font-bold tracking-wide shadow-[0_0_8px_rgba(20,232,255,0.25)]">
+                +20% Stealth
+              </div>
+              <button onclick="event.stopPropagation(); reclaimStashedCoins()"
+                class="px-3.5 py-1 rounded-xl bg-[#1e2538] hover:bg-[#2a344e] text-slate-200 text-xs font-bold transition active:scale-95">
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 01 Coin Loading Controls (Image 2) -->
+          <div class="w-full space-y-2 pt-1">
+            <div class="flex items-center justify-between">
+              <span class="font-display font-bold text-xs sm:text-sm text-white">
+                Load MCH Coins Into Vault
+              </span>
+              <span class="text-xs font-semibold text-cyanGlow">
+                Watch coin stack rise
+              </span>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              <button onclick="loadCoins(25, this)"
+                class="py-2.5 rounded-xl bg-[#080d1a] hover:bg-cyanGlow/10 border border-cyanGlow text-cyanGlow font-display font-extrabold text-xs sm:text-sm transition active:scale-95 shadow-[0_0_8px_rgba(20,232,255,0.2)]">
+                +25
+              </button>
+              <button onclick="loadCoins(100, this)"
+                class="py-2.5 rounded-xl bg-[#080d1a] hover:bg-violetGlow/15 border border-violetGlow text-violetGlow font-display font-extrabold text-xs sm:text-sm transition active:scale-95 shadow-[0_0_8px_rgba(168,85,247,0.25)]">
+                +100
+              </button>
+              <button onclick="loadCoins(250, this)"
+                class="py-2.5 rounded-xl bg-[#080d1a] hover:bg-magentaGlow/15 border border-magentaGlow text-magentaGlow font-display font-extrabold text-xs sm:text-sm transition active:scale-95 shadow-[0_0_8px_rgba(255,42,133,0.25)]">
+                +250
+              </button>
+              <button onclick="loadMaxHalf(this)"
+                class="py-2.5 rounded-xl bg-[#080d1a] hover:bg-goldMch/15 border border-goldMch text-goldMch font-display font-extrabold text-xs sm:text-sm transition active:scale-95 shadow-[0_0_8px_rgba(255,209,102,0.25)]">
+                Max Half
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================= -->
+      <!-- MODE A: HIDE & TAG FRIEND                               -->
+      <!-- ======================================================= -->
+      <div id="view-hide" class="space-y-3.5">
+
+        <!-- Step 2: 8 Tactical Hiding Locations (2x4 Grid) -->
+        <section class="bg-surface/90 border border-white/10 rounded-2xl p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h2 class="font-display font-bold text-sm text-white flex items-center gap-1.5">
+              <span class="text-violetGlow">02</span> Pick Hiding Zone (8 Spots)
+            </h2>
+            <span id="selected-spot-tag" class="text-[11px] font-bold text-cyanGlow">Shadow Vault</span>
+          </div>
+
+          <div id="hide-locations-grid" class="grid grid-cols-2 gap-2">
+            <!-- Populated by JS -->
+          </div>
+        </section>
+
+        <!-- Step 3: Set Tactical Clue & Tag Squad Friend -->
+        <section class="bg-surface/90 border border-white/10 rounded-2xl p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="font-display font-bold text-sm text-white flex items-center gap-1.5">
+              <span class="text-magentaGlow">03</span> Drop Clue & Tag Friend
+            </h2>
+            <span class="text-[11px] text-slate-400">1-line riddle</span>
+          </div>
+
+          <!-- Preset Clue Chips -->
+          <div id="clue-presets" class="flex flex-wrap gap-1.5">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- Custom 1-Line Clue Input -->
+          <input id="custom-clue-input" type="text" maxlength="75"
+            value="Look where neon signals bounce off steel..."
+            placeholder="Write a 1-line riddle for your friend..."
+            class="w-full bg-obsidian border border-white/15 focus:border-cyanGlow rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none" />
+
+          <!-- Quick-Tag Squad Chips -->
+          <div id="squad-chips" class="grid grid-cols-4 gap-1.5">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- Custom @username Input -->
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cyanGlow font-bold text-xs">@</span>
+            <input id="friend-handle-input" type="text" placeholder="Or enter any Telegram @username"
+              oninput="handleCustomFriendInput(this.value)"
+              class="w-full bg-obsidian border border-white/15 focus:border-cyanGlow rounded-xl pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 outline-none" />
+          </div>
+
+          <!-- Primary Lock & Tag Action -->
+          <button onclick="lockStashAndTagFriend()"
+            class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyanGlow via-violetGlow to-magentaGlow text-obsidian font-display font-bold text-sm tracking-wide shadow-[0_0_22px_rgba(20,232,255,0.4)] hover:brightness-110 active:scale-[0.98] transition flex items-center justify-center gap-2">
+            <span>🔐</span>
+            <span>LOCK STASH & TAG <span id="cta-target-friend">@ALEX</span></span>
+          </button>
+
+          <!-- Live Confirmation & Copyable Telegram Challenge Link Banner -->
+          <div id="challenge-link-card" class="hidden bg-obsidian/95 border border-cyanGlow/50 rounded-2xl p-3 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-cyanGlow">✓ Stash Locked & Tagged!</span>
+              <span id="locked-summary-pill" class="text-[11px] text-goldMch font-semibold">150 MCH • Shadow Vault</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="telegram-share-url" type="text" readonly
+                class="flex-1 bg-surface border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-300 outline-none" />
+              <button onclick="copyChallengeLink()"
+                class="bg-cyanGlow text-obsidian font-display font-bold text-xs px-3 py-1.5 rounded-lg hover:brightness-110 active:scale-95 transition shrink-0">
+                Copy Link
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ======================================================= -->
+      <!-- MODE B: RAID FRIEND'S STASH (3 SCANNER PROBES)          -->
+      <!-- ======================================================= -->
+      <div id="view-raid" class="hidden space-y-3.5">
+        <section class="bg-surface/90 border border-magentaGlow/40 rounded-2xl p-3.5 space-y-3 shadow-[0_0_20px_rgba(255,42,133,0.15)]">
+          <!-- Challenger Header & Scanner Probes Left -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span id="raid-challenger-avatar" class="text-lg">🦊</span>
+              <div>
+                <div class="font-display font-bold text-xs text-white">
+                  Target: <span id="raid-challenger-name" class="text-magentaGlow">@Jordan's</span> Hidden Stash
+                </div>
+                <div class="text-[11px] text-goldMch font-semibold">
+                  Bounty Pool: <span id="raid-bounty-amount">180 MCH</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3 Scanner Probes Indicator -->
+            <div class="text-right">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">SCANNER PROBES</div>
+              <div id="probes-dots" class="flex items-center justify-end gap-1 mt-0.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyanGlow shadow-[0_0_8px_#14e8ff]"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-cyanGlow shadow-[0_0_8px_#14e8ff]"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-cyanGlow shadow-[0_0_8px_#14e8ff]"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tactical Intercepted Clue Box -->
+          <div class="bg-obsidian/90 border border-white/10 rounded-xl p-2.5">
+            <div class="text-[10px] uppercase tracking-wider text-cyanGlow font-bold mb-0.5">INTERCEPTED CLUE</div>
+            <p id="raid-clue-text" class="text-xs text-slate-200 italic">
+              "Sealed three floors below bedrock behind a blast hatch..."
+            </p>
+          </div>
+
+          <!-- Hot / Cold Radar Feedback Banner & Store Upsell -->
+          <div id="raid-radar-status" class="bg-card border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-center text-slate-300">
+            Select 1 of the 8 zones below to deploy a Scanner Probe.
+          </div>
+
+          <!-- Trigger 2: Out of Probes Refill Banner Button (Shown when probesLeft === 0) -->
+          <div id="out-of-probes-upsell" class="hidden">
+            <button onclick="openStoreModal('probes')"
+              class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-magentaGlow/30 via-violetGlow/30 to-cyanGlow/30 border border-magentaGlow text-xs font-display font-bold text-white shadow-[0_0_16px_rgba(255,42,133,0.35)] flex items-center justify-center gap-1.5 transition active:scale-[0.98] animate-pulse">
+              <span>⚡</span>
+              <span>Out of Probes! Buy +3 Scanner Probes to Keep Raiding ($0.99 / 50 ⭐)</span>
+            </button>
+          </div>
+
+          <!-- 8 Raid Locations Grid -->
+          <div id="raid-locations-grid" class="grid grid-cols-2 gap-2">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- New Raid Challenge Button -->
+          <button onclick="cycleRaidChallenge()"
+            class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 font-display font-bold text-xs text-cyanGlow transition">
+            ↻ Load Next Friend Challenge
+          </button>
+        </section>
+      </div>
+
+      <!-- ======================================================= -->
+      <!-- 2. PERSISTENT BOTTOM: LIVE SQUAD FEED                   -->
+      <!-- ======================================================= -->
+      <section class="bg-surface/90 border border-white/10 rounded-2xl p-3.5 space-y-2.5 shadow-md">
+        <div class="flex items-center justify-between">
+          <span class="font-display font-bold text-xs text-slate-200 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]"></span>
+            Recent Raids & Tags
+          </span>
+          <span class="text-[10px] text-slate-400 font-mono">Live Squad Feed</span>
+        </div>
+        <div id="activity-feed-list" class="space-y-1.5 text-xs">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ========================================================= -->
+    <!-- PAYMENT STORE MODAL: BUY PLAYS & MCH COINS               -->
+    <!-- ========================================================= -->
+    <div id="store-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-obsidian/85 backdrop-blur-md p-4">
+      <div class="bg-surface w-full max-w-sm rounded-3xl p-5 border border-goldMch/50 shadow-[0_0_36px_rgba(255,209,102,0.3)] space-y-4 max-h-[92vh] overflow-y-auto">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">⚡</span>
+            <div>
+              <h3 class="font-display font-bold text-base text-white">Buy Plays & MCH Coins</h3>
+              <p class="text-[11px] text-goldMch font-semibold">Instant Delivery • Cards, Apple Pay & Stars</p>
+            </div>
+          </div>
+          <button onclick="closeStoreModal()" class="w-8 h-8 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center hover:bg-white/20 transition">✕</button>
+        </div>
+
+        <!-- Store Category Tabs -->
+        <div class="grid grid-cols-2 gap-1 p-1 bg-obsidian rounded-xl border border-white/10">
+          <button id="store-tab-probes" onclick="switchStoreTab('probes')"
+            class="py-2 px-1 rounded-lg text-xs font-display font-bold text-white bg-card border border-cyanGlow/40 shadow-sm transition">
+            ⚡ Extra Raid Plays
+          </button>
+          <button id="store-tab-coins" onclick="switchStoreTab('coins')"
+            class="py-2 px-1 rounded-lg text-xs font-display font-bold text-slate-400 hover:text-white transition">
+            🪙 MCH Coin Packs
+          </button>
+        </div>
+
+        <!-- Tab 1: Extra Raid Plays (Probes) -->
+        <div id="store-view-probes" class="space-y-2.5">
+          <!-- Pack A -->
+          <div onclick="selectStorePack('pack_a')" id="card-pack_a"
+            class="p-3 rounded-2xl bg-card border-2 border-cyanGlow cursor-pointer transition hover:bg-white/5 active:scale-[0.99] flex items-center justify-between">
+            <div>
+              <div class="font-display font-bold text-xs text-white flex items-center gap-1.5">
+                <span class="text-cyanGlow">⚡ Pack A:</span> +3 Scanner Probes
+              </div>
+              <div class="text-[10px] text-slate-400">Continue Current Raid immediately</div>
+            </div>
+            <div class="text-right">
+              <div class="font-display font-extrabold text-sm text-goldMch">$0.99</div>
+              <div class="text-[10px] text-slate-400 font-semibold">or 50 ⭐</div>
+            </div>
+          </div>
+
+          <!-- Pack B -->
+          <div onclick="selectStorePack('pack_b')" id="card-pack_b"
+            class="p-3 rounded-2xl bg-card border border-white/10 cursor-pointer transition hover:bg-white/5 active:scale-[0.99] flex items-center justify-between">
+            <div>
+              <div class="font-display font-bold text-xs text-white flex items-center gap-1.5">
+                <span class="text-magentaGlow">🔥 Pack B:</span> +10 Probes + 2x Streak
+              </div>
+              <div class="text-[10px] text-slate-400">Streak boost applied instantly</div>
+            </div>
+            <div class="text-right">
+              <div class="font-display font-extrabold text-sm text-goldMch">$2.49</div>
+              <div class="text-[10px] text-slate-400 font-semibold">or 125 ⭐</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: MCH Coin Packs -->
+        <div id="store-view-coins" class="hidden space-y-2.5">
+          <!-- Pack C -->
+          <div onclick="selectStorePack('pack_c')" id="card-pack_c"
+            class="p-3 rounded-2xl bg-card border border-white/10 cursor-pointer transition hover:bg-white/5 active:scale-[0.99] flex items-center justify-between">
+            <div>
+              <div class="font-display font-bold text-xs text-white flex items-center gap-1.5">
+                <span class="text-goldMch">🪙 Pack C:</span> +1,000 MCH Coins
+              </div>
+              <div class="text-[10px] text-slate-400">Stake bigger bounties & tag squad</div>
+            </div>
+            <div class="text-right">
+              <div class="font-display font-extrabold text-sm text-goldMch">$1.99</div>
+              <div class="text-[10px] text-slate-400 font-semibold">or 100 ⭐</div>
+            </div>
+          </div>
+
+          <!-- Pack D -->
+          <div onclick="selectStorePack('pack_d')" id="card-pack_d"
+            class="p-3 rounded-2xl bg-card border border-white/10 cursor-pointer transition hover:bg-white/5 active:scale-[0.99] flex items-center justify-between">
+            <div>
+              <div class="font-display font-bold text-xs text-white flex items-center gap-1.5">
+                <span class="text-goldMch">👑 Pack D:</span> +5,000 MCH Coins
+              </div>
+              <div class="text-[10px] text-cyanGlow font-semibold">+ Apex Hunter Badge included</div>
+            </div>
+            <div class="text-right">
+              <div class="font-display font-extrabold text-sm text-goldMch">$7.99</div>
+              <div class="text-[10px] text-slate-400 font-semibold">or 400 ⭐</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkout Selection Section -->
+        <div class="pt-2 border-t border-white/10 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Select Checkout Method:</div>
+
+          <!-- Method 2: Telegram Stars One-Tap Button -->
+          <button onclick="checkoutWithStars()"
+            class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/25 to-yellow-500/20 hover:from-amber-500/35 hover:to-yellow-500/30 border border-amber-400/60 font-display font-bold text-xs text-white flex items-center justify-between transition active:scale-[0.98]">
+            <span class="flex items-center gap-1.5">
+              <span>⭐</span>
+              <span>Pay with Telegram Stars</span>
+            </span>
+            <span id="stars-price-label" class="font-mono text-amber-300 font-bold">50 ⭐</span>
+          </button>
+
+          <!-- Method 1: Credit Card / Apple Pay / Google Pay Sheet -->
+          <div class="bg-obsidian/90 border border-white/10 rounded-2xl p-3 space-y-2.5">
+            <!-- Apple / Google Pay Instant Button -->
+            <button onclick="checkoutWithDigitalWallet()"
+              class="w-full py-2.5 rounded-xl bg-white text-black font-display font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition active:scale-95 shadow-sm">
+              <span>Pay</span>
+              <span class="text-slate-400">/</span>
+              <span>GPay</span>
+              <span class="text-xs text-slate-600 font-normal">One-Tap Checkout</span>
+            </button>
+
+            <div class="flex items-center gap-2 my-1">
+              <div class="h-[1px] bg-white/10 flex-1"></div>
+              <span class="text-[10px] text-slate-500 uppercase font-semibold">Or pay with card</span>
+              <div class="h-[1px] bg-white/10 flex-1"></div>
+            </div>
+
+            <!-- Stripe-Style Card Input Simulation -->
+            <div class="space-y-1.5 text-xs">
+              <div class="relative">
+                <input id="card-number" type="text" placeholder="Card number: 4242 •••• •••• 4242"
+                  value="4242 •••• •••• 4242"
+                  class="w-full bg-card border border-white/15 focus:border-cyanGlow rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none" />
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">💳</span>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5">
+                <input id="card-exp" type="text" placeholder="MM/YY: 12/28" value="12/28"
+                  class="bg-card border border-white/15 focus:border-cyanGlow rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none" />
+                <input id="card-cvc" type="text" placeholder="CVC: 888" value="888"
+                  class="bg-card border border-white/15 focus:border-cyanGlow rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none" />
+              </div>
+            </div>
+
+            <!-- Card Pay CTA -->
+            <button onclick="checkoutWithCard()"
+              class="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyanGlow to-magentaGlow text-obsidian font-display font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-95 transition shadow-sm">
+              <span>🔒</span>
+              <span>Pay <span id="card-price-label">$0.99</span> with Card</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- NON-CUSTODIAL POLYGON WALLET MODAL                        -->
+    <!-- ========================================================= -->
+    <div id="wallet-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-obsidian/85 backdrop-blur-md p-4">
+      <div class="bg-surface w-full max-w-sm rounded-3xl p-5 border border-cyanGlow/45 shadow-[0_0_30px_rgba(20,232,255,0.28)] space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <img src="../public/IMG_0900.jpeg" alt="MCH" onerror="this.style.display='none'" class="w-9 h-9 mch-logo-frame" />
+            <div>
+              <h3 class="font-display font-bold text-base text-white">Connect Wallet</h3>
+              <p class="text-[11px] text-cyanGlow font-semibold">Polygon PoS • Non-Custodial</p>
+            </div>
+          </div>
+          <button onclick="closeWalletModal()" class="w-8 h-8 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center">✕</button>
+        </div>
+
+        <p class="text-xs text-slate-300 leading-relaxed">
+          Link your self-custody wallet to <strong class="text-cyanGlow">mycoinharvest.com</strong>. Your keys stay 100% under your control.
+        </p>
+
+        <div class="space-y-2">
+          <button onclick="connectWallet('MetaMask')" class="w-full flex items-center justify-between p-3 rounded-2xl bg-card hover:bg-white/10 border border-white/10 transition">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🦊</span>
+              <span class="font-display font-bold text-sm text-white">MetaMask</span>
+            </div>
+            <span class="text-xs font-bold text-cyanGlow">Connect →</span>
+          </button>
+
+          <button onclick="connectWallet('Trust Wallet')" class="w-full flex items-center justify-between p-3 rounded-2xl bg-card hover:bg-white/10 border border-white/10 transition">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🛡️</span>
+              <span class="font-display font-bold text-sm text-white">Trust Wallet</span>
+            </div>
+            <span class="text-xs font-bold text-cyanGlow">Connect →</span>
+          </button>
+
+          <button onclick="connectWallet('WalletConnect')" class="w-full flex items-center justify-between p-3 rounded-2xl bg-card hover:bg-white/10 border border-white/10 transition">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🔗</span>
+              <span class="font-display font-bold text-sm text-white">WalletConnect</span>
+            </div>
+            <span class="text-xs font-bold text-cyanGlow">Connect →</span>
+          </button>
+        </div>
+
+        <div id="wallet-disconnect-wrap" class="hidden">
+          <button onclick="disconnectWallet()" class="w-full py-2.5 rounded-2xl bg-magentaGlow/20 border border-magentaGlow/60 text-magentaGlow font-display font-bold text-xs">
+            Disconnect Wallet
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GAME LOGIC & PAYMENT STORE INTERACTIVITY -->
+  <script>
+    // 8 Distinct Tactical Hiding Locations
+    const LOCATIONS = [
+      {
+        id: 'shadow_vault',
+        name: 'Shadow Vault',
+        tag: 'High Stealth',
+        flavor: 'Encrypted cipher lock',
+        bonus: '+20% Stealth Bonus',
+        sector: 1,
+        clue: 'Locked behind biometric steel where zero light leaks...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-cyanGlow" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5v-1.5M12 17v-1.5M8.5 12H7M17 12h-1.5"/></svg>`
+      },
+      {
+        id: 'neon_canopy',
+        name: 'Neon Canopy',
+        tag: 'Treehouse Grid',
+        flavor: 'High branches & vines',
+        bonus: '+15% Stealth Bonus',
+        sector: 2,
+        clue: 'Suspended in glowing roots high above the forest floor...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 14h5l-2 5h10l-2-5h5L12 3z"/><path d="M12 19v3"/></svg>`
+      },
+      {
+        id: 'subway_tunnel',
+        name: 'Subway Tunnel',
+        tag: 'Underground Line',
+        flavor: 'Echoing metro tracks',
+        bonus: '+18% Stealth Bonus',
+        sector: 3,
+        clue: 'Beneath concrete rails where midnight trains hum in the dark...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-violetGlow" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="15" rx="4"/><path d="M4 11h16M8 18l-2 3M16 18l2 3"/><circle cx="8.5" cy="14.5" r="1"/><circle cx="15.5" cy="14.5" r="1"/></svg>`
+      },
+      {
+        id: 'rooftop_relay',
+        name: 'Rooftop Relay',
+        tag: 'Signal Tower',
+        flavor: 'Skyline antenna dish',
+        bonus: '+22% Stealth Bonus',
+        sector: 4,
+        clue: 'Where neon satellite dishes catch the highest wind...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 12v9M8 21h8M12 12L7 7M12 12l5-5"/><path d="M4.9 4.9a10 10 0 0 1 14.2 0"/></svg>`
+      },
+      {
+        id: 'sunken_pier',
+        name: 'Sunken Pier',
+        tag: 'Harbor Docks',
+        flavor: 'Foggy tide pilings',
+        bonus: '+16% Stealth Bonus',
+        sector: 5,
+        clue: 'Under salt-worn planks where cold harbor waves slap...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-cyanGlow" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0"/><path d="M5 12h14M7 7v9M17 7v9"/></svg>`
+      },
+      {
+        id: 'cyber_arcade',
+        name: 'Cyber Arcade',
+        tag: 'Backroom Locker',
+        flavor: 'Retro cabinet alley',
+        bonus: '+14% Stealth Bonus',
+        sector: 6,
+        clue: 'Behind buzzing 8-bit cabinets and token machines...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-magentaGlow" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><rect x="8" y="5" width="8" height="6" rx="1"/><circle cx="9.5" cy="15" r="1"/><path d="M14 14v2M13 15h2"/></svg>`
+      },
+      {
+        id: 'canyon_bridge',
+        name: 'Canyon Bridge',
+        tag: 'Outpost Gorge',
+        flavor: 'Suspended steel span',
+        bonus: '+20% Stealth Bonus',
+        sector: 7,
+        clue: 'Clipped beneath steel cables over a sheer desert drop...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-goldMch" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 15h20M6 7v12M18 7v12"/><path d="M6 7c3 5 9 5 12 0"/></svg>`
+      },
+      {
+        id: 'obsidian_bunker',
+        name: 'Obsidian Bunker',
+        tag: 'Deep Core',
+        flavor: 'Sub-level blast door',
+        bonus: '+25% Stealth Bonus',
+        sector: 8,
+        clue: 'Sealed three floors below bedrock behind a blast hatch...',
+        svg: `<svg viewBox="0 0 24 24" class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/><path d="M12 8v5M12 16h.01"/></svg>`
+      }
+    ];
+
+    const SQUAD_FRIENDS = [
+      { handle: '@Alex', badge: '⚡' },
+      { handle: '@Maya', badge: '🦊' },
+      { handle: '@Jordan', badge: '🎯' },
+      { handle: '@Sam', badge: '🛡️' }
+    ];
+
+    const CLUE_PRESETS = [
+      'Follow the neon hum underground...',
+      'High above the trees where signals bounce.',
+      'Behind heavy steel in the dark.'
+    ];
+
+    const RAID_TARGETS = [
+      {
+        challenger: '@Jordan',
+        avatar: '🦊',
+        bounty: 180,
+        targetLocationId: 'obsidian_bunker',
+        clue: 'Sealed three floors below bedrock behind a blast hatch...'
+      },
+      {
+        challenger: '@Maya',
+        avatar: '🦊',
+        bounty: 220,
+        targetLocationId: 'subway_tunnel',
+        clue: 'Beneath concrete rails where midnight trains hum in the dark...'
+      },
+      {
+        challenger: '@Sam',
+        avatar: '🛡️',
+        bounty: 160,
+        targetLocationId: 'neon_canopy',
+        clue: 'Suspended in bioluminescent branches and treehouse vines...'
+      },
+      {
+        challenger: '@Alex',
+        avatar: '⚡',
+        bounty: 250,
+        targetLocationId: 'rooftop_relay',
+        clue: 'High on the skyline where microwave satellite dishes scan the clouds...'
+      }
+    ];
+
+    // Store Packs definition
+    const STORE_PACKS = {
+      pack_a: { id: 'pack_a', name: '+3 Scanner Probes', priceUsd: 0.99, stars: 50, type: 'probes', probes: 3, bonus: '' },
+      pack_b: { id: 'pack_b', name: '+10 Scanner Probes + 2x Streak Boost', priceUsd: 2.49, stars: 125, type: 'probes', probes: 10, streakBoost: 2 },
+      pack_c: { id: 'pack_c', name: '+1,000 MCH Coins', priceUsd: 1.99, stars: 100, type: 'coins', coins: 1000 },
+      pack_d: { id: 'pack_d', name: '+5,000 MCH Coins + Apex Hunter Badge', priceUsd: 7.99, stars: 400, type: 'coins', coins: 5000, rankBadge: 'Apex Hunter' }
+    };
+
+    let selectedStorePackId = 'pack_a';
+
+    // Global State
+    let state = {
+      balance: 1000,
+      stashedBounty: 100,
+      streak: 2,
+      selectedLocationId: 'shadow_vault',
+      selectedFriend: '@Alex',
+      walletAddress: '',
+      feed: [
+        { text: '@Maya hid 220 MCH in Subway Tunnel and tagged @Alex', time: '1m ago', dot: 'bg-cyanGlow shadow-[0_0_6px_#14e8ff]' },
+        { text: "@Jordan cracked @Sam's stash in Neon Canopy (+180 MCH)", time: '4m ago', dot: 'bg-goldMch shadow-[0_0_6px_#ffd166]' },
+        { text: '@Alex locked a decoy trap in Cyber Arcade', time: '9m ago', dot: 'bg-magentaGlow shadow-[0_0_6px_#ff2a85]' }
+      ]
+    };
+
+    // Raid State
+    let raidChallengeIndex = 0;
+    let raidState = {
+      challenger: '@Jordan',
+      avatar: '🦊',
+      bounty: 180,
+      targetLocationId: 'obsidian_bunker',
+      probesLeft: 3,
+      guessedIds: [],
+      roundOver: false
+    };
+
+    // Synthesized Audio
+    let synth = null;
+    function playTone(type) {
+      try {
+        if (typeof Tone === 'undefined') return;
+        if (Tone.context.state !== 'running') Tone.start();
+        if (!synth) {
+          synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.01, decay: 0.14, sustain: 0.04, release: 0.2 }
+          }).toDestination();
+          synth.volume.value = -12;
+        }
+        if (type === 'coin') synth.triggerAttackRelease(['E5', 'B5'], '16n');
+        else if (type === 'win') synth.triggerAttackRelease(['C5', 'E5', 'G5', 'C6'], '8n');
+        else if (type === 'miss') synth.triggerAttackRelease(['D4', 'A3'], '16n');
+        else synth.triggerAttackRelease('G4', '32n');
+      } catch (e) {}
+    }
+
+    function triggerConfetti() {
+      const palette = ['#14e8ff', '#9b5de5', '#ff2a85', '#ffd166'];
+      for (let i = 0; i < 35; i++) {
+        const bit = document.createElement('div');
+        bit.className = 'confetti-bit';
+        bit.style.left = `${6 + Math.random() * 88}%`;
+        bit.style.backgroundColor = palette[i % palette.length];
+        bit.style.animationDelay = `${Math.random() * 0.25}s`;
+        document.body.appendChild(bit);
+        setTimeout(() => bit.remove(), 1600);
+      }
+    }
+
+    let toastTimeout = null;
+    function showToast(msg, icon = '⚡') {
+      const banner = document.getElementById('toast-banner');
+      document.getElementById('toast-icon').textContent = icon;
+      document.getElementById('toast-text').textContent = msg;
+      banner.classList.remove('-translate-y-32', 'opacity-0');
+      banner.classList.add('translate-y-0', 'opacity-100');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        banner.classList.add('-translate-y-32', 'opacity-0');
+        banner.classList.remove('translate-y-0', 'opacity-100');
+      }, 3200);
+    }
+
+    function updateHeaderUI() {
+      document.getElementById('mch-balance').textContent = `${state.balance.toLocaleString()} MCH`;
+      if (document.getElementById('stashed-bounty-number')) {
+        document.getElementById('stashed-bounty-number').textContent = state.stashedBounty.toLocaleString();
+      }
+      if (document.getElementById('chest-loaded-text')) {
+        document.getElementById('chest-loaded-text').textContent = state.stashedBounty.toLocaleString();
+      }
+      document.getElementById('streak-badge').textContent = `🔥 ${state.streak}x Streak`;
+      document.getElementById('cta-target-friend').textContent = state.selectedFriend.toUpperCase();
+
+      const rank = state.balance >= 5000 ? 'Apex Hunter' : state.balance >= 1500 ? 'Shadow Raider' : 'Scout Rank';
+      document.getElementById('rank-badge').textContent = rank;
+    }
+
+    function peekChest() {
+      const chest = document.getElementById('hero-chest');
+      const badge = document.getElementById('chest-ready-badge');
+      const isOpen = chest.classList.contains('chest-open');
+      
+      if (isOpen) {
+        chest.classList.remove('chest-open');
+        if (badge) {
+          badge.classList.remove('animate-ready-emerge-vanish');
+          badge.style.opacity = '0';
+        }
+        playTone('tap');
+      } else {
+        chest.classList.add('chest-open');
+        playTone('coin');
+        if (badge) {
+          badge.textContent = `${state.stashedBounty || 100} MCH Ready`;
+          badge.classList.remove('animate-ready-emerge-vanish');
+          void badge.offsetWidth; // Force CSS reflow to re-trigger keyframe animation
+          badge.classList.add('animate-ready-emerge-vanish');
+        }
+      }
+    }
+
+    function loadCoins(amount, btnEl) {
+      if (state.balance < amount) {
+        showToast('Not enough MCH Coins! Open store to reload.', '⚠️');
+        openStoreModal('coins');
+        return;
+      }
+      state.balance -= amount;
+      state.stashedBounty += amount;
+      updateHeaderUI();
+      playTone('coin');
+
+      const chest = document.getElementById('hero-chest');
+      const badge = document.getElementById('chest-ready-badge');
+      if (chest && !chest.classList.contains('chest-open')) {
+        chest.classList.add('chest-open');
+      }
+      if (badge) {
+        badge.textContent = `${state.stashedBounty} MCH Ready`;
+        badge.classList.remove('animate-ready-emerge-vanish');
+        void badge.offsetWidth;
+        badge.classList.add('animate-ready-emerge-vanish');
+      }
+    }
+
+    function loadMaxHalf(btnEl) {
+      const half = Math.floor(state.balance / 2);
+      if (half <= 0) return;
+      loadCoins(half, btnEl);
+    }
+
+    function reclaimStashedCoins() {
+      if (state.stashedBounty === 0) return;
+      state.balance += state.stashedBounty;
+      state.stashedBounty = 0;
+      updateHeaderUI();
+      playTone('tap');
+      const badge = document.getElementById('chest-ready-badge');
+      if (badge) {
+        badge.classList.remove('animate-ready-emerge-vanish');
+        badge.style.opacity = '0';
+      }
+      showToast('Returned stashed coins to your MCH balance.', '🪙');
+    }
+
+    function switchMode(mode) {
+      const hideView = document.getElementById('view-hide');
+      const raidView = document.getElementById('view-raid');
+      const tabHide = document.getElementById('tab-hide');
+      const tabRaid = document.getElementById('tab-raid');
+
+      if (mode === 'hide') {
+        hideView.classList.remove('hidden');
+        raidView.classList.add('hidden');
+        tabHide.className = 'py-2.5 px-3 rounded-xl font-display font-bold text-xs transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-cyanGlow/25 via-violetGlow/25 to-magentaGlow/25 border border-cyanGlow/50 text-white shadow-[0_0_15px_rgba(20,232,255,0.2)]';
+        tabRaid.className = 'py-2.5 px-3 rounded-xl font-display font-bold text-xs transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      } else {
+        hideView.classList.add('hidden');
+        raidView.classList.remove('hidden');
+        tabRaid.className = 'py-2.5 px-3 rounded-xl font-display font-bold text-xs transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-magentaGlow/25 via-violetGlow/25 to-cyanGlow/25 border border-magentaGlow/50 text-white shadow-[0_0_15px_rgba(255,42,133,0.2)]';
+        tabHide.className = 'py-2.5 px-3 rounded-xl font-display font-bold text-xs transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      }
+      playTone('tap');
+    }
+
+    function renderHideLocations() {
+      const grid = document.getElementById('hide-locations-grid');
+      grid.innerHTML = LOCATIONS.map(loc => {
+        const isSelected = loc.id === state.selectedLocationId;
+        return `
+          <button onclick="selectHideLocation('${loc.id}')"
+            class="p-2.5 rounded-xl border text-left transition active:scale-[0.98] flex items-start gap-2.5 ${
+              isSelected
+                ? 'bg-gradient-to-br from-cyanGlow/20 via-violetGlow/15 to-magentaGlow/15 border-cyanGlow shadow-[0_0_14px_rgba(20,232,255,0.25)]'
+                : 'bg-card border-white/10 hover:border-white/25'
+            }">
+            <div class="w-8 h-8 rounded-lg bg-obsidian border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
+              ${loc.svg}
+            </div>
+            <div class="min-w-0">
+              <div class="font-display font-bold text-xs text-white truncate">${loc.name}</div>
+              <div class="text-[10px] font-semibold text-cyanGlow truncate">${loc.tag}</div>
+              <div class="text-[10px] text-slate-400 truncate">${loc.flavor}</div>
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectHideLocation(id) {
+      state.selectedLocationId = id;
+      const loc = LOCATIONS.find(l => l.id === id);
+      if (loc) {
+        document.getElementById('selected-spot-tag').textContent = loc.name;
+        document.getElementById('chest-multiplier-badge').textContent = loc.bonus;
+      }
+      playTone('tap');
+      renderHideLocations();
+    }
+
+    function renderCluePresets() {
+      const container = document.getElementById('clue-presets');
+      container.innerHTML = CLUE_PRESETS.map(clue => `
+        <button onclick="applyPresetClue('${clue.replace(/'/g, "\\'")}')"
+          class="text-[10px] font-medium bg-card hover:bg-white/10 border border-white/10 text-slate-300 px-2.5 py-1 rounded-full transition">
+          "${clue}"
+        </button>
+      `).join('');
+    }
+
+    function applyPresetClue(text) {
+      document.getElementById('custom-clue-input').value = text;
+      playTone('tap');
+    }
+
+    function renderSquadChips() {
+      const container = document.getElementById('squad-chips');
+      container.innerHTML = SQUAD_FRIENDS.map(f => {
+        const active = state.selectedFriend.toLowerCase() === f.handle.toLowerCase();
+        return `
+          <button onclick="selectSquadFriend('${f.handle}')"
+            class="py-2 px-1.5 rounded-xl border text-xs font-display font-bold transition active:scale-95 flex items-center justify-center gap-1 ${
+              active
+                ? 'bg-cyanGlow/20 border-cyanGlow text-white shadow-[0_0_12px_rgba(20,232,255,0.25)]'
+                : 'bg-card border-white/10 text-slate-300 hover:border-white/25'
+            }">
+            <span>${f.badge}</span>
+            <span>${f.handle}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectSquadFriend(handle) {
+      state.selectedFriend = handle;
+      document.getElementById('friend-handle-input').value = '';
+      playTone('tap');
+      renderSquadChips();
+      updateHeaderUI();
+    }
+
+    function handleCustomFriendInput(val) {
+      const trimmed = val.trim();
+      if (!trimmed) return;
+      state.selectedFriend = trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+      renderSquadChips();
+      updateHeaderUI();
+    }
+
+    function lockStashAndTagFriend() {
+      if (state.stashedBounty <= 0) {
+        showToast('Load at least +25 MCH into the chest before hiding!', '⚠️');
+        return;
+      }
+
+      const loc = LOCATIONS.find(l => l.id === state.selectedLocationId) || LOCATIONS[0];
+      const cleanFriend = state.selectedFriend.replace('@', '');
+      const shareUrl = `https://t.me/mycoinharvest_bot/treasure?startapp=${loc.id}_${cleanFriend}_${state.stashedBounty}`;
+
+      document.getElementById('locked-summary-pill').textContent = `${state.stashedBounty} MCH • ${loc.name}`;
+      document.getElementById('telegram-share-url').value = shareUrl;
+      document.getElementById('challenge-link-card').classList.remove('hidden');
+
+      // Prepend to Live Activity Feed with Cyan Dot
+      state.feed.unshift({
+        text: `You hid ${state.stashedBounty} MCH in ${loc.name} and tagged ${state.selectedFriend}`,
+        time: 'Just now',
+        dot: 'bg-cyanGlow shadow-[0_0_6px_#14e8ff]'
+      });
+      renderActivityFeed();
+
+      state.stashedBounty = 0;
+      state.streak += 1;
+      updateHeaderUI();
+
+      playTone('win');
+      triggerConfetti();
+      showToast(`Stash locked in ${loc.name}! Challenge sent to ${state.selectedFriend}.`, '🔐');
+    }
+
+    function copyChallengeLink() {
+      const input = document.getElementById('telegram-share-url');
+      input.select();
+      input.setSelectionRange(0, 99999);
+      try {
+        navigator.clipboard.writeText(input.value);
+      } catch (e) {
+        document.execCommand('copy');
+      }
+      playTone('coin');
+      showToast(`Challenge link copied! Send to ${state.selectedFriend}`, '📋');
+    }
+
+    // =========================================================================
+    // RAID MODE: PROBES, CYCLING & STORE TRIGGER
+    // =========================================================================
+    function loadRaidTarget(index) {
+      const t = RAID_TARGETS[index % RAID_TARGETS.length];
+      raidState = {
+        challenger: t.challenger,
+        avatar: t.avatar,
+        bounty: t.bounty,
+        targetLocationId: t.targetLocationId,
+        probesLeft: 3,
+        guessedIds: [],
+        roundOver: false
+      };
+
+      document.getElementById('raid-challenger-avatar').textContent = t.avatar;
+      document.getElementById('raid-challenger-name').textContent = `${t.challenger}'s`;
+      document.getElementById('raid-bounty-amount').textContent = `${t.bounty} MCH`;
+      document.getElementById('raid-clue-text').textContent = `"${t.clue}"`;
+      document.getElementById('raid-radar-status').textContent = 'Select 1 of the 8 zones below to deploy a Scanner Probe.';
+      document.getElementById('raid-radar-status').className = 'bg-card border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-center text-slate-300';
+      document.getElementById('out-of-probes-upsell').classList.add('hidden');
+
+      updateProbesUI();
+      renderRaidLocations();
+    }
+
+    function cycleRaidChallenge() {
+      raidChallengeIndex++;
+      loadRaidTarget(raidChallengeIndex);
+      playTone('tap');
+      showToast(`New challenge intercepted from ${raidState.challenger}!`, '📡');
+    }
+
+    function updateProbesUI() {
+      const container = document.getElementById('probes-dots');
+      let html = '';
+      for (let i = 0; i < 3; i++) {
+        if (i < raidState.probesLeft) {
+          html += `<span class="w-2.5 h-2.5 rounded-full bg-cyanGlow shadow-[0_0_8px_#14e8ff]"></span>`;
+        } else {
+          html += `<span class="w-2.5 h-2.5 rounded-full bg-white/15"></span>`;
+        }
+      }
+      container.innerHTML = html;
+    }
+
+    function renderRaidLocations() {
+      const grid = document.getElementById('raid-locations-grid');
+      grid.innerHTML = LOCATIONS.map(loc => {
+        const guessed = raidState.guessedIds.includes(loc.id);
+        const isTarget = loc.id === raidState.targetLocationId;
+
+        if (guessed && isTarget) {
+          return `
+            <div class="p-2.5 rounded-xl bg-goldMch/20 border-2 border-goldMch shadow-[0_0_16px_rgba(255,209,102,0.4)] flex items-center gap-2">
+              <span class="text-lg">🎁</span>
+              <div class="min-w-0">
+                <div class="font-display font-bold text-xs text-goldMch truncate">${loc.name}</div>
+                <div class="text-[10px] font-extrabold text-white">+${raidState.bounty} MCH Won!</div>
+              </div>
+            </div>
+          `;
+        }
+
+        if (guessed && !isTarget) {
+          return `
+            <div class="p-2.5 rounded-xl bg-obsidian/70 border border-white/5 opacity-55 flex items-center gap-2">
+              <span class="text-sm text-slate-500 font-bold">✕</span>
+              <div class="min-w-0">
+                <div class="font-display font-bold text-xs text-slate-400 line-through truncate">${loc.name}</div>
+                <div class="text-[10px] text-slate-500 font-medium">Sector Empty</div>
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <button onclick="probeRaidLocation('${loc.id}')" ${raidState.roundOver ? 'disabled' : ''}
+            class="p-2.5 rounded-xl bg-card hover:bg-magentaGlow/15 border border-white/10 hover:border-magentaGlow/50 text-left transition active:scale-[0.98] flex items-start gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+            <div class="w-8 h-8 rounded-lg bg-obsidian border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
+              ${loc.svg}
+            </div>
+            <div class="min-w-0">
+              <div class="font-display font-bold text-xs text-white truncate">${loc.name}</div>
+              <div class="text-[10px] text-magentaGlow font-bold tracking-wide">Scan Sector</div>
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function probeRaidLocation(locId) {
+      if (raidState.roundOver || raidState.guessedIds.includes(locId)) return;
+
+      raidState.guessedIds.push(locId);
+      raidState.probesLeft -= 1;
+      updateProbesUI();
+
+      const targetLoc = LOCATIONS.find(l => l.id === raidState.targetLocationId);
+      const guessedLoc = LOCATIONS.find(l => l.id === locId);
+      const radarBanner = document.getElementById('raid-radar-status');
+      const upsellBanner = document.getElementById('out-of-probes-upsell');
+
+      if (locId === raidState.targetLocationId) {
+        raidState.roundOver = true;
+        state.balance += raidState.bounty;
+        state.streak += 1;
+        updateHeaderUI();
+
+        const chest = document.getElementById('hero-chest');
+        chest.classList.add('chest-open');
+        setTimeout(() => chest.classList.remove('chest-open'), 1200);
+
+        radarBanner.className = 'bg-goldMch/20 border border-goldMch rounded-xl px-3 py-2 text-xs font-bold text-center text-goldMch shadow-[0_0_14px_rgba(255,209,102,0.3)]';
+        radarBanner.textContent = `CRACKED! Found ${raidState.challenger}'s stash in ${targetLoc.name} (+${raidState.bounty} MCH)!`;
+        upsellBanner.classList.add('hidden');
+
+        // Prepend with Gold Dot to Live Activity Feed
+        state.feed.unshift({
+          text: `You cracked ${raidState.challenger}'s stash in ${targetLoc.name} (+${raidState.bounty} MCH)`,
+          time: 'Just now',
+          dot: 'bg-goldMch shadow-[0_0_6px_#ffd166]'
+        });
+        renderActivityFeed();
+
+        playTone('win');
+        triggerConfetti();
+        renderRaidLocations();
+        return;
+      }
+
+      // Proximity Distance Check
+      const sectorDiff = Math.abs(targetLoc.sector - guessedLoc.sector);
+      const hint = sectorDiff <= 2
+        ? '🔥 HOT SIGNAL! Sensor registers high electromagnetic resonance nearby!'
+        : '❄️ COLD SIGNAL! Sector empty. No cipher trace detected.';
+
+      if (raidState.probesLeft <= 0) {
+        raidState.roundOver = true;
+        radarBanner.className = 'bg-magentaGlow/20 border border-magentaGlow/60 rounded-xl px-3 py-2 text-xs font-bold text-center text-magentaGlow';
+        radarBanner.textContent = `Out of probes! ${raidState.challenger}'s stash was hidden in ${targetLoc.name}.`;
+        
+        // Trigger 2: Prominently show Out of Probes Refill Button
+        upsellBanner.classList.remove('hidden');
+        playTone('miss');
+      } else {
+        radarBanner.className = 'bg-cyanGlow/15 border border-cyanGlow/40 rounded-xl px-3 py-2 text-xs font-semibold text-center text-cyanGlow';
+        radarBanner.textContent = `${hint} (${raidState.probesLeft} probe${raidState.probesLeft === 1 ? '' : 's'} left)`;
+        upsellBanner.classList.add('hidden');
+        playTone('miss');
+      }
+
+      renderRaidLocations();
+    }
+
+    // =========================================================================
+    // PERSISTENT LIVE ACTIVITY FEED (WITH COLORED DOTS)
+    // =========================================================================
+    function renderActivityFeed() {
+      const list = document.getElementById('activity-feed-list');
+      list.innerHTML = state.feed.slice(0, 4).map(item => `
+        <div class="flex items-center justify-between gap-2.5 bg-obsidian/75 border border-white/5 rounded-xl px-3 py-2 hover:border-white/15 transition">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2 h-2 rounded-full shrink-0 ${item.dot}"></span>
+            <span class="truncate text-slate-300 text-xs">${item.text}</span>
+          </div>
+          <span class="text-[10px] text-slate-500 font-mono shrink-0 whitespace-nowrap">${item.time}</span>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // STORE MODAL (TABS, CHECKOUT, STARS & PROBE REFILL)
+    // =========================================================================
+    function openStoreModal(initialTab = 'probes') {
+      const modal = document.getElementById('store-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      switchStoreTab(initialTab);
+      playTone('tap');
+    }
+
+    function closeStoreModal() {
+      const modal = document.getElementById('store-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function switchStoreTab(tab) {
+      const viewProbes = document.getElementById('store-view-probes');
+      const viewCoins = document.getElementById('store-view-coins');
+      const tabProbes = document.getElementById('store-tab-probes');
+      const tabCoins = document.getElementById('store-tab-coins');
+
+      if (tab === 'probes') {
+        viewProbes.classList.remove('hidden');
+        viewCoins.classList.add('hidden');
+        tabProbes.className = 'py-2 px-1 rounded-lg text-xs font-display font-bold text-white bg-card border border-cyanGlow/40 shadow-sm transition';
+        tabCoins.className = 'py-2 px-1 rounded-lg text-xs font-display font-bold text-slate-400 hover:text-white transition';
+        selectStorePack('pack_a');
+      } else {
+        viewProbes.classList.add('hidden');
+        viewCoins.classList.remove('hidden');
+        tabCoins.className = 'py-2 px-1 rounded-lg text-xs font-display font-bold text-white bg-card border border-goldMch/40 shadow-sm transition';
+        tabProbes.className = 'py-2 px-1 rounded-lg text-xs font-display font-bold text-slate-400 hover:text-white transition';
+        selectStorePack('pack_c');
+      }
+    }
+
+    function selectStorePack(packId) {
+      selectedStorePackId = packId;
+      const pack = STORE_PACKS[packId];
+      if (!pack) return;
+
+      // Update card borders
+      ['pack_a', 'pack_b', 'pack_c', 'pack_d'].forEach(id => {
+        const el = document.getElementById(`card-${id}`);
+        if (!el) return;
+        if (id === packId) {
+          el.className = 'p-3 rounded-2xl bg-card border-2 border-cyanGlow shadow-[0_0_14px_rgba(20,232,255,0.25)] cursor-pointer transition flex items-center justify-between';
+        } else {
+          el.className = 'p-3 rounded-2xl bg-card border border-white/10 cursor-pointer transition hover:bg-white/5 flex items-center justify-between';
+        }
+      });
+
+      document.getElementById('card-price-label').textContent = `$${pack.priceUsd.toFixed(2)}`;
+      document.getElementById('stars-price-label').textContent = `${pack.stars} ⭐`;
+    }
+
+    function completeStorePurchase(methodLabel) {
+      const pack = STORE_PACKS[selectedStorePackId] || STORE_PACKS['pack_a'];
+
+      // Credit Pack
+      if (pack.type === 'probes') {
+        raidState.probesLeft += pack.probes;
+        raidState.roundOver = false; // Allow ended round to resume!
+        if (pack.streakBoost) {
+          state.streak += pack.streakBoost;
+        }
+        updateProbesUI();
+        renderRaidLocations();
+        
+        // Hide upsell and restore banner
+        document.getElementById('out-of-probes-upsell').classList.add('hidden');
+        const radarBanner = document.getElementById('raid-radar-status');
+        radarBanner.className = 'bg-cyanGlow/15 border border-cyanGlow/40 rounded-xl px-3 py-2 text-xs font-semibold text-center text-cyanGlow';
+        radarBanner.textContent = `Probes refilled (+${pack.probes})! Scanner back online.`;
+        
+        showToast(`Purchased ${pack.name} via ${methodLabel}! Raid resumed.`, '⚡');
+      } else if (pack.type === 'coins') {
+        state.balance += pack.coins;
+        showToast(`Purchased ${pack.name} via ${methodLabel}!`, '🪙');
+      }
+
+      updateHeaderUI();
+      closeStoreModal();
+      playTone('win');
+      triggerConfetti();
+    }
+
+    function checkoutWithStars() {
+      const pack = STORE_PACKS[selectedStorePackId] || STORE_PACKS['pack_a'];
+      if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openInvoice === 'function') {
+        window.Telegram.WebApp.openInvoice(`https://t.me/invoice/${pack.id}`, (status) => {
+          if (status === 'paid') {
+            completeStorePurchase('Telegram Stars');
+          } else {
+            completeStorePurchase('Telegram Stars (Simulated)');
+          }
+        });
+      } else {
+        // Fallback simulation in browser
+        completeStorePurchase('Telegram Stars (50 ⭐)');
+      }
+    }
+
+    function checkoutWithDigitalWallet() {
+      completeStorePurchase('Apple Pay / GPay');
+    }
+
+    function checkoutWithCard() {
+      completeStorePurchase('Credit Card');
+    }
+
+    // =========================================================================
+    // WALLET CONNECT MODAL
+    // =========================================================================
+    function openWalletModal() {
+      const m = document.getElementById('wallet-modal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeWalletModal() {
+      const m = document.getElementById('wallet-modal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function connectWallet(provider) {
+      state.walletAddress = '0x71C...9A4E';
+      document.getElementById('wallet-label').textContent = state.walletAddress;
+      document.getElementById('wallet-dot').className = 'w-2 h-2 rounded-full bg-cyanGlow animate-pulse';
+      document.getElementById('wallet-disconnect-wrap').classList.remove('hidden');
+      closeWalletModal();
+      playTone('coin');
+      showToast(`${provider} linked on Polygon (${state.walletAddress})`, '🔗');
+    }
+
+    function disconnectWallet() {
+      state.walletAddress = '';
+      document.getElementById('wallet-label').textContent = 'Connect Wallet';
+      document.getElementById('wallet-dot').className = 'w-2 h-2 rounded-full bg-amber-400';
+      document.getElementById('wallet-disconnect-wrap').classList.add('hidden');
+      closeWalletModal();
+      showToast('Wallet disconnected.', '🔌');
+    }
+
+    // App Initialization
+    window.onload = function () {
+      renderHideLocations();
+      renderCluePresets();
+      renderSquadChips();
+      renderActivityFeed();
+      loadRaidTarget(0);
+      updateHeaderUI();
+    };
+  </script>
+</body>
+</html>
